@@ -42,7 +42,7 @@ function validRoot(value,expected){
  if(typeof value!=='string'||!path.win32.isAbsolute(value)||value.includes('\0'))throw Error('Absolute Windows directory required');
  const canonical=fs.realpathSync.native(value);
  if(!fs.statSync(canonical).isDirectory())throw Error('Not a directory');
- if(expected&&path.win32.basename(canonical).toLowerCase()!==expected.toLowerCase())throw Error('Workspace root name mismatch');
+ // Workspace display names are labels only; the user explicitly authorizes an existing absolute directory.
  return canonical;
 }
 function closeSession(id){const s=sessions.get(id);if(!s)return; sessions.delete(id);try{s.pty.kill();}catch{} }
