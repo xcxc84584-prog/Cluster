@@ -18,7 +18,7 @@
  const ROOT_MARKER='.cluster-terminal-root.json';
  let pendingRootHandle=null;
  const rootNodes=()=>window.ClusterCEXP?.roots||[];
- function rootNodeFor(root){return rootNodes().find(n=>(n.persistId||n.id)===root.id)}
+ function rootNodeFor(root){return root?.handle?root:rootNodes().find(n=>(n.persistId||n.id)===root?.id)}
  async function markerFor(node){if(!node?.handle)throw Error('Explorer Root is unavailable');try{const h=await node.handle.getFileHandle(ROOT_MARKER);const v=JSON.parse(await (await h.getFile()).text());if(v.schema===1&&v.workspaceId===(node.persistId||node.id)&&/^[a-f0-9]{64}$/.test(v.nonce))return v}catch{}return null}
  async function createMarker(node){const id=node.persistId||node.id;const existing=await markerFor(node);if(existing)return existing;const nonce=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');const v={schema:1,workspaceId:id,nonce};const h=await node.handle.getFileHandle(ROOT_MARKER,{create:true});const writer=await h.createWritable();await writer.write(JSON.stringify(v,null,2)+'\n');await writer.close();return v}
 
@@ -60,15 +60,15 @@
  async function createSession(explicitRoot=null){showTab();if(!connected()){$('terminalSetup').hidden=false;$('terminalBind').hidden=true;$('terminalOutput').hidden=true;return}
   try{await loadXterm()}catch(e){showError(e);$('terminalSetup').hidden=false;return}
   if(!explicitRoot){const id='cluster-drive-c';pendingWorkspace={id,name:'C:\\\\'};if(boundWorkspaces.has(id)){send({type:'create',workspaceId:id,requestId:crypto.randomUUID(),cols:100,rows:30});return}send({type:'bind',workspaceId:id,path:'C:\\\\'});return}
-  const root=explicitRoot;pendingWorkspace=root;
+  const root=explicitRoot;pendingWorkspace=root;pendingRootHandle=rootNodeFor(root);
   if(boundWorkspaces.has(root.id)){send({type:'create',workspaceId:root.id,requestId:crypto.randomUUID(),cols:100,rows:30});return}
   send({type:'lookupRoot',workspaceId:root.id,requestId:crypto.randomUUID()});
  }
- $('terminalBindButton').onclick=async()=>{const root=pendingWorkspace,node=pendingRootHandle,path=$('terminalRootPath').value.trim();$('terminalBindError').textContent='';if(!root||!node){$('terminalBindError').textContent='Choose an Explorer Root first.';return}if(!/^[a-zA-Z]:[\\\\/]/.test(path)&&!/^\\\\\\\\[^\\\\]+\\\\[^\\\\]+/.test(path)){$('terminalBindError').textContent='Enter an absolute Windows folder path.';return}try{$('terminalBindButton').disabled=true;const marker=await createMarker(node);send({type:'registerRoot',workspaceId:root.id,path,nonce:marker.nonce,requestId:crypto.randomUUID()});}catch(e){$('terminalBindError').textContent=e.message}finally{$('terminalBindButton').disabled=false}};
+ $('terminalBindButton').onclick=async()=>{const root=pendingWorkspace,node=pendingRootHandle,path=$('terminalRootPath').value.trim();$('terminalBindError').textContent='';if(!root||!node?.handle){$('terminalBindError').textContent='Explorer Root handle unavailable. Close this registration page and reopen PowerShell from the Root folder action.';return}if(!/^[a-zA-Z]:[\\\\/]/.test(path)&&!/^\\\\\\\\[^\\\\]+\\\\[^\\\\]+/.test(path)){$('terminalBindError').textContent='Enter an absolute Windows folder path.';return}try{$('terminalBindButton').disabled=true;const marker=await createMarker(node);send({type:'registerRoot',workspaceId:root.id,path,nonce:marker.nonce,requestId:crypto.randomUUID()});}catch(e){$('terminalBindError').textContent=e.message}finally{$('terminalBindButton').disabled=false}};
  $('terminalBrowseButton').onclick=()=>{ $('terminalBindError').textContent=''; try{send({type:'openExplorer'});}catch(e){$('terminalBindError').textContent=e.message;} }; 
  $('terminalConnect').onclick=connect;$('terminalNew').onclick=()=>void createSession();$('terminalClose').onclick=()=>{if(selected)close(selected)};
  function open(){void createSession(null)}
- function openAtWorkspace(root){if(!root?.id||root.kind!=='directory')return open();const top=(()=>{let n=root;while(n.parent)n=n.parent;return n})();void createSession({id:top.persistId||top.id,name:top.name});}
+ function openAtWorkspace(root){if(!root?.id||root.kind!=='directory')return open();const top=(()=>{let n=root;while(n.parent)n=n.parent;return n})();void createSession({id:top.persistId||top.id,name:top.name,handle:top.handle,kind:top.kind});}
  function clearLocalPermission(){revoked=true;$('terminalPairStatus').textContent='Permission removed';sessionStorage.removeItem('cluster-terminal-token');localStorage.removeItem(STORAGE_TOKEN);localStorage.removeItem(STORAGE_ROOTS);localStorage.removeItem('cluster-terminal-last-root-v1');tokenInput.value='';$('terminalRemember').checked=false;boundWorkspaces.clear();}
  $('terminalRevoke').onclick=()=>{if(!confirm('撤銷此裝置的 Cluster Terminal 配對？這會關閉目前所有終端並輪換 Agent Token。'))return;if(connected()){send({type:'revoke'});}else{clearLocalPermission();showError('已清除瀏覽器儲存的配對資訊。Agent 未連線，無法撤銷其 Token；請先連線或在本機執行解除安裝。');}};
  $('terminalDismissGuide').onclick=()=>{if(!connected()){$('terminalSetup').hidden=true;panel.hidden=true;window.cluster?.fm?.notify?.();}else{$('terminalSetup').hidden=true;}};
