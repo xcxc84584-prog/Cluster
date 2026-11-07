@@ -74,6 +74,7 @@ wss.on('connection',ws=>{
  });
  ws.on('close',()=>{clearTimeout(timeout);for(const id of owned)closeSession(id);});
 });
+server.on('error',e=>{if(e.code==='EADDRINUSE'){console.error('Port '+PORT+' already in use. Cluster Agent may already be running. Do not start a second copy.');process.exitCode=0;}else{console.error(e);process.exitCode=1;}});
 server.listen(PORT,'127.0.0.1',()=>{
  console.log('Cluster Terminal Agent listening on 127.0.0.1:'+PORT);
  console.log('Allowed origin: '+allowedOrigin);
