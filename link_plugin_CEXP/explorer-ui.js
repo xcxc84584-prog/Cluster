@@ -2,8 +2,18 @@
 'use strict';
 (()=>{const api=window.ClusterCEXP,$=id=>document.getElementById(id),panel=$('cexpSidebar'),tree=$('cexpTree'),status=$('cexpStatus');let selected=null;let activeNode=null;let activeDetail=null;let revealSerial=0;let dragState=null;let moveMode=false;
  const setStatus=(msg,error=false)=>{status.textContent=msg;status.className=error?'cexp-error':'';};
- // Dock Explorer inside the actual workarea, immediately below the shared tab/LOG row.
- const workarea=$('workarea');if(workarea&&panel.parentElement!==workarea)workarea.prepend(panel);
+ // Workspace shell: Explorer and the editor/tab column are true flex siblings.
+ // Explorer begins directly under the app header; tabs move WITH the editor.
+ const workarea=$('workarea'),tabbar=$('tabList');
+ if(workarea&&tabbar){
+  let shell=document.getElementById('clusterWorkspaceShell');
+  if(!shell){
+   shell=document.createElement('div');shell.id='clusterWorkspaceShell';
+   const right=document.createElement('div');right.id='clusterEditorColumn';
+   tabbar.parentNode.insertBefore(shell,tabbar);
+   shell.append(panel,right);right.append(tabbar,workarea);
+  }
+ }
  function toggle(open){panel.hidden=!open;document.body.classList.toggle('cexp-open',open);window.dispatchEvent(new Event('resize'));requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));$('cexpToggle').setAttribute('aria-expanded',String(open));if(open){$('blockDirectory').hidden=true;$('blockDirectoryButton').setAttribute('aria-expanded','false');}}
  $('cexpToggle').addEventListener('click',()=>toggle(panel.hidden));$('cexpClose').addEventListener('click',()=>toggle(false));
  $('cexpAddRoot').addEventListener('click',async()=>{try{if(!window.showDirectoryPicker)throw Error('請使用支援 File System Access API 的 Chromium 瀏覽器');const h=await showDirectoryPicker({mode:'readwrite'});await api.addRoot(h);setStatus('已加入 '+h.name);}catch(e){if(e.name!=='AbortError')setStatus(e.message,true);}});
