@@ -23,7 +23,8 @@
  }
  window.ClusterTabs={
   closeByDocId:id=>closeBatch(fm.docs.filter(d=>d.id===id)),
-  closeByHandle:async h=>closeBatch(fm.docs.filter(d=>d.handle===h)),
+  closeByHandle:async h=>{const docs=[];for(const d of fm.docs)if(await sameHandle(d.handle,h))docs.push(d);return closeBatch(docs)},
+  closeByRoot:async rootHandle=>{const docs=[];for(const d of fm.docs){if(!d.handle||!rootHandle)continue;try{if(await rootHandle.isSameEntry(d.handle)){docs.push(d);continue}const relative=await rootHandle.resolve(d.handle);if(relative!==null)docs.push(d)}catch{}}return closeBatch(docs)},
   closeNodes:nodes=>closeBatch(nodes.flatMap(matching)),
   isOpenHandle:async h=>!!(await findOpen(h)),
   getActiveDoc:()=>fm.active?{documentId:fm.active.id,...detail(fm.active)}:null
