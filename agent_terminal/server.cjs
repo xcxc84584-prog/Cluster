@@ -4,6 +4,7 @@ const http=require('node:http');
 const crypto=require('node:crypto');
 const fs=require('node:fs');
 const path=require('node:path');
+const {spawn}=require('node:child_process');
 const {WebSocketServer}=require('ws');
 const pty=require('node-pty');
 const PORT=Number(process.env.CLUSTER_TERMINAL_PORT||43879);
@@ -57,6 +58,12 @@ wss.on('connection',ws=>{
     roots.clear();
     for(const client of wss.clients){send(client,{type:'revoked'});setTimeout(()=>client.close(1000,'Pairing revoked'),50);}
     return;
+   }
+   if(m.type==='openExplorer'){
+    if(process.platform!=='win32')throw Error('Windows File Explorer is only available on Windows');
+    const child=spawn('explorer.exe',[],{detached:true,stdio:'ignore',windowsHide:false});
+    child.on('error',e=>send(ws,{type:'error',message:'Unable to open File Explorer: '+e.message}));
+    child.unref();send(ws,{type:'explorerOpened'});return;
    }
    if(m.type==='bind'){
     if(typeof m.workspaceId!=='string'||!/^[-\w:.]{1,160}$/.test(m.workspaceId))throw Error('Invalid workspace ID');
