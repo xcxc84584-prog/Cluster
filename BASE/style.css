@@ -452,3 +452,6 @@ body.cexp-open .app main,body.cexp-open .app .tabs{margin-left:0!important;width
 #clusterEditorColumn #workarea > #clusterTerminalPanel,#clusterEditorColumn #workarea > #editorShell,#clusterEditorColumn #workarea > #localRangeView{flex:1 1 0!important;min-width:0!important;width:100%!important}
 #clusterEditorColumn #workarea > #empty{left:0!important;right:0!important}
 @media(max-width:550px){#clusterWorkspaceShell > #cexpSidebar{flex-basis:min(310px,55vw)!important;width:min(310px,55vw)!important;max-width:min(310px,55vw)!important}}
+
+/* opt19: press and hold a tab for 450ms, then move horizontally to reorder */
+#tabList .tab.cluster-tab-dragging{opacity:.7;outline:1px solid #a0a0a0;background:#252525;cursor:grabbing;z-index:2}#tabList .tab{touch-action:pan-x}
