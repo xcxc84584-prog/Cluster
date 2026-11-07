@@ -1,0 +1,7 @@
+[0] DOCUMENT_IDENTITY: HorizontalAxis 1.1.0 / Cluster opt13
+[1] GOAL: X scrollbar appearance and operation match native Y scrollbar.
+[2] API: window.ClusterHorizontalAxis.update() compatibility no-op.
+[3] INSTALL: Load horizontal-axis.js after BASE scripts; CSS in BASE/style.css.
+[4] ABT: AREA A1 editor configuration, BEHAVIOR B1 wrap=off, TRIGGER T1 plugin load.
+[5] SAFETY: Never mutate document value; no polling or custom slider.
+[6] TEST: long lines, short lines, horizontal+vertical scroll, gutter alignment, L0 and local range.

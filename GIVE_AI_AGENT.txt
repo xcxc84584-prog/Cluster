@@ -1,0 +1,1 @@
+Cluster v0.0.5 clean-slate. BASE/ contains UI, PLUGIN/FileManager handles file lifetime, PLUGIN/SegmentLoader owns slices/index/transactions. local-powershell is BASE-level shell. Do not reintroduce old application scripts. Before claiming PR PASS, run real browser tests. Keep original UI stylesheet in BASE/legacy-style.css.

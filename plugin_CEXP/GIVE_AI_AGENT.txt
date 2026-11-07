@@ -1,0 +1,9 @@
+PluginName: CEXP
+Version: 1.7.2 (ported unchanged from Cluster v0.0.4 opt13.2)
+Core: explorer-core.js
+Link: ../link_plugin_CEXP/host-adapter.js + explorer-ui.js
+Requires: File System Access API, IndexedDB, ClusterExplorerHost adapter.
+Security: folder access requires browser permission.
+Uninstall: remove CEXP script references; data remains until user clears site data.
+Backup: original filesystem folders and IndexedDB root references.
+Tests: browser functional and regression tests required.

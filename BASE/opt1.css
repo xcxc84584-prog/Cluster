@@ -1,0 +1,22 @@
+/* Opt1: original opt13.2 DOM and style; only functionality-neutral adjustments */
+#cexpToggle:disabled{opacity:.65;cursor:not-allowed}
+#clusterLoad{display:block;max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#clusterLoad[hidden]{display:none!important}
+#editorShell{position:relative}
+#editorShell.has-common #editor,#editorShell.has-common #gutter{height:calc(100% - 42px)}
+#notice{max-width:35vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* [FIX-002] Preserve legacy gutter appearance while preventing merged numbers. */
+#gutter{white-space:normal!important;overflow:hidden}
+#gutter .line-number{display:block!important;box-sizing:border-box;min-height:23.2px;height:23.2px;line-height:23.2px;white-space:nowrap!important}
+@media(max-width:550px){#gutter .line-number{min-height:20px;height:20px;line-height:20px}}
+
+/* [FIX-PR5] Original opt13.2 block-directory styling retained from style.css. */
+#blockDirectory{z-index:100;}
+#gutter .line-number.cluster-block{color:#60a5fa;font-weight:700;}
+
+/* opt7: reuse original opt13.2 styles; minor additions only */
+#uiLanguage{background:#192335;color:#e1e9f5;border:1px solid #43546a;border-radius:5px;max-width:110px;padding:4px}
+.cluster-rename{font-size:11px;background:#1b2d42;color:#d7e6f7;border:1px solid #435977;border-radius:5px;padding:4px 6px}
+#cexpTree .cexp-node[draggable=true]{cursor:grab}
+#cexpTree .cexp-node.cexp-drop{outline:1px dashed #76b6ef}

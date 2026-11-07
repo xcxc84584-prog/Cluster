@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const js=fs.readFileSync(new URL('../BASE/opt1.js',import.meta.url),'utf8');
+const css=fs.readFileSync(new URL('../BASE/opt1.css',import.meta.url),'utf8');
+assert.match(js,/function renderGutter\(first,total\)/);
+assert.match(js,/row\.className='line-number'/);
+assert.match(js,/gutter\.replaceChildren\(fragment\)/);
+assert.match(js,/refreshSmallGutter\(\)/);
+assert.doesNotMatch(js,/gutter\.textContent=Array\.from/);
+assert.match(css,/#gutter \.line-number\{display:block!important/);
+console.log('PASS: gutter DOM rows and CSS regression checks');

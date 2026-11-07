@@ -1,0 +1,32 @@
+/* [ADD-PR18] CEXP LINK adapter; no host-internal imports. */
+(()=>{'use strict';const fm=window.cluster.fm;
+ const detail=d=>({docId:d.id,handle:d.handle,name:d.name});
+ window.ClusterExplorerHost={
+  openHandle:async h=>{const existing=fm.docs.find(d=>d.handle===h);if(existing){fm.select(existing.id);return existing}return fm.open(await h.getFile(),h)},
+  activateDraft:async id=>fm.select(id),
+  getOpenDocuments:()=>fm.docs.map(detail)
+ };
+ // [FIX-OPT11-001] LINK owns tab lifecycle; Explorer never edits BASE DOM.
+ const matching=(n)=>fm.docs.filter(d=>(n.docId&&d.id===n.docId)||(n.handle&&d.handle===n.handle));
+ function closeBatch(docs){
+  const unique=[...new Set(docs)];
+  if(unique.some(d=>d.dirty)&&!window.confirm('有尚未儲存的文件。關閉分頁前請確認草稿已保存。仍要關閉？'))return false;
+  // A single batch mutation avoids transient activation and repeated redraw.
+  const ids=new Set(unique.map(d=>d.id));
+  fm.docs=fm.docs.filter(d=>!ids.has(d.id));
+  if(fm.active&&ids.has(fm.active.id))fm.active=fm.docs.at(-1)||null;
+  fm.notify();return true;
+ }
+ window.ClusterTabs={
+  closeByDocId:id=>closeBatch(fm.docs.filter(d=>d.id===id)),
+  closeByHandle:async h=>closeBatch(fm.docs.filter(d=>d.handle===h)),
+  closeNodes:nodes=>closeBatch(nodes.flatMap(matching)),
+  isOpenHandle:async h=>fm.docs.some(d=>d.handle===h),
+  getActiveDoc:()=>fm.active?{documentId:fm.active.id,...detail(fm.active)}:null
+ };
+ let previous=new Map();let active=null;
+ function sync(){const next=new Map(fm.docs.map(d=>[d.id,d]));for(const [id,d] of next)if(!previous.has(id))window.dispatchEvent(new CustomEvent('cluster:file-operation',{detail:{type:d.handle?'open':'new',...detail(d)}}));
+  for(const [id,d] of previous)if(!next.has(id))window.dispatchEvent(new CustomEvent('cluster:file-operation',{detail:{type:'close',...detail(d)}}));
+  previous=next;if(fm.active!==active){active=fm.active;window.dispatchEvent(new CustomEvent('cluster:active-file',{detail:active?detail(active):null}));}}
+ fm.onChange(sync);sync();
+})();

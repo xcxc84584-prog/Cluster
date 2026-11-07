@@ -1,0 +1,11 @@
+PluginName: WorkspacePersistence
+Version: 0.0.8
+Purpose: IndexedDB snapshots, auto-save and index cache
+Host: Cluster v0.0.5 opt8
+Install: keep plugin folder and load its JS after BASE standalone; see BASE/index.html.
+API: DOM events and Cluster FileManager public adapter; no network.
+Security: user-granted handles only; never bypass browser permissions.
+Uninstall: remove script reference; data remains in browser IndexedDB until user clears site data.
+Backup: browser site data and original local files separately.
+Restore: redeploy plugin and use same origin.
+Tests: manual browser tests required.

@@ -1,0 +1,10 @@
+.cluster-terminal-panel{position:relative;display:flex;flex-direction:column;flex:1;min-height:0;width:100%;background:#10141b;color:#e4eaf4;overflow:hidden}
+.cluster-terminal-panel[hidden],.terminal-setup[hidden],.terminal-output[hidden]{display:none!important}
+.terminal-toolbar{display:flex;align-items:center;gap:12px;padding:8px 12px;background:#1b2330;border-bottom:1px solid #364151;font-size:12px}
+.terminal-toolbar #terminalState{flex:1;color:#aebdd1}
+.terminal-toolbar button,.terminal-setup button{background:#25334a;color:#e4eaf4;border:1px solid #53647d;border-radius:5px;padding:5px 9px;cursor:pointer}
+.terminal-setup{padding:20px;overflow:auto;max-width:760px;line-height:1.7;font-size:13px}
+.terminal-setup input{background:#111923;color:#fff;border:1px solid #60718b;border-radius:4px;padding:8px;min-width:270px;max-width:100%;margin:0 8px}
+.terminal-setup label{display:block;margin:14px 0}.terminal-setup [role=alert]{color:#ff9999}.terminal-note{color:#b9c7d9}
+.terminal-output{flex:1;min-height:0;padding:8px;overflow:hidden}.terminal-screen{width:100%;height:100%;min-height:150px}
+.terminal-tab .tab-select{color:#a8c6ff}
