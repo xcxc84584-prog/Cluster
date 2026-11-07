@@ -27,14 +27,6 @@ if(fs.existsSync(tokenFile)){
 
 const MAX_SESSIONS=8,MAX_MESSAGE=65536;
 const roots=new Map();const sessions=new Map();
-const registryFile=path.join(configDir,'workspace-registry.json');
-function registry(){try{const v=JSON.parse(fs.readFileSync(registryFile,'utf8'));return v&&typeof v==='object'&&!Array.isArray(v)?v:{}}catch{return {}}}
-function saveRegistry(v){const tmp=registryFile+'.tmp';fs.writeFileSync(tmp,JSON.stringify(v,null,2));fs.renameSync(tmp,registryFile)}
-function digest(v){return crypto.createHash('sha256').update(v).digest('hex')}
-const MARKER='.cluster-terminal-root.json';
-function readMarker(dir){try{const v=JSON.parse(fs.readFileSync(path.join(dir,MARKER),'utf8'));if(v.schema!==1||!/^[-\w:.]{1,160}$/.test(v.workspaceId)||!/^[a-f0-9]{64}$/.test(v.nonce))return null;return v}catch{return null}}
-function verifiedRecord(id){const entry=registry()[id];if(!entry)return null;let dir;try{dir=validRoot(entry.path)}catch{return null}const marker=readMarker(dir);if(!marker||marker.workspaceId!==id||digest(marker.nonce)!==entry.checksum)return null;return {path:dir,checksum:entry.checksum}}
-
 const server=http.createServer((req,res)=>{res.writeHead(404,{'Content-Type':'text/plain','Cache-Control':'no-store'});res.end('Not Found');});
 const wss=new WebSocketServer({noServer:true,maxPayload:MAX_MESSAGE});
 function isLoopback(addr){return addr==='127.0.0.1'||addr==='::1'||addr==='::ffff:127.0.0.1';}
@@ -75,34 +67,10 @@ wss.on('connection',ws=>{
     },120);
     return;
    }
-   if(m.type==='openExplorer'){
-    if(process.platform!=='win32')throw Error('Windows File Explorer is only available on Windows');
-    const child=spawn('explorer.exe',[],{detached:true,stdio:'ignore',windowsHide:false});
-    child.on('error',e=>send(ws,{type:'error',message:'Unable to open File Explorer: '+e.message}));
-    child.unref();send(ws,{type:'explorerOpened'});return;
-   }
-   if(m.type==='lookupRoot'){
-    if(typeof m.workspaceId!=='string'||!/^[-\\w:.]{1,160}$/.test(m.workspaceId))throw Error('Invalid workspace ID');
-    const record=verifiedRecord(m.workspaceId);
-    send(ws,{type:'rootLookup',workspaceId:m.workspaceId,found:!!record,path:record?.path||null,checksum:record?.checksum||null,requestId:m.requestId});return;
-   }
-   if(m.type==='registerRoot'){
-    if(typeof m.workspaceId!=='string'||!/^[-\\w:.]{1,160}$/.test(m.workspaceId))throw Error('Invalid workspace ID');
-    const dir=validRoot(m.path);const marker=readMarker(dir);
-    if(!marker||marker.workspaceId!==m.workspaceId||marker.nonce!==m.nonce)throw Error('Root verification failed. Choose the same directory opened in Cluster Explorer.');
-    const checksum=digest(marker.nonce);const entries=registry();
-    entries[m.workspaceId]={path:dir,checksum,updatedAt:new Date().toISOString()};saveRegistry(entries);
-    roots.set(m.workspaceId,dir);send(ws,{type:'rootRegistered',workspaceId:m.workspaceId,checksum,requestId:m.requestId});return;
-   }
-   if(m.type==='openRoot'){
-    const record=verifiedRecord(m.workspaceId);
-    if(!record)throw Error('Root moved, missing, or verification failed. Register its new location.');
-    roots.set(m.workspaceId,record.path);
-    send(ws,{type:'bound',workspaceId:m.workspaceId,rootName:path.win32.basename(record.path),requestId:m.requestId});return;
-   }
    if(m.type==='bind'){
     if(typeof m.workspaceId!=='string'||!/^[-\w:.]{1,160}$/.test(m.workspaceId))throw Error('Invalid workspace ID');
-    const dir=validRoot(m.path,m.rootName);roots.set(m.workspaceId,dir);send(ws,{type:'bound',workspaceId:m.workspaceId,rootName:path.win32.basename(dir)});return;
+    if(m.workspaceId!=='cluster-drive-c'||typeof m.path!=='string'||!/^C:\\\\$/.test(m.path))throw Error('Only C:\\\\ terminal sessions are supported');
+    const dir=validRoot('C:\\\\');roots.set(m.workspaceId,dir);send(ws,{type:'bound',workspaceId:m.workspaceId,rootName:path.win32.basename(dir)});return;
    }
    if(m.type==='create'){
     if(sessions.size>=MAX_SESSIONS)throw Error('Session limit reached');
