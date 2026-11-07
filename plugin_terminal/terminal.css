@@ -8,3 +8,6 @@
 .terminal-setup label{display:block;margin:14px 0}.terminal-setup [role=alert]{color:#ff9999}.terminal-note{color:#b9c7d9}
 .terminal-output{flex:1;min-height:0;padding:8px;overflow:hidden}.terminal-screen{width:100%;height:100%;min-height:150px}
 .terminal-tab .tab-select{color:#a8c6ff}
+
+/* opt10 */
+.terminal-dismiss{float:right;margin-left:1rem}.cexp-open-terminal{font-weight:700}

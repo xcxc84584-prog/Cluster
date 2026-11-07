@@ -50,6 +50,14 @@ wss.on('connection',ws=>{
  ws.on('message',raw=>{
   let m;try{m=JSON.parse(raw.toString());if(!m||typeof m.type!=='string')throw Error('Invalid message');
    if(!authorized){if(m.type!=='auth'||typeof m.token!=='string'||m.token.length!==token.length||!crypto.timingSafeEqual(Buffer.from(m.token),Buffer.from(token)))throw Error('Authentication failed');authorized=true;clearTimeout(timeout);send(ws,{type:'ready',maxSessions:MAX_SESSIONS});return;}
+   if(m.type==='revoke'){
+    token=crypto.randomBytes(32).toString('hex');
+    fs.writeFileSync(tokenFile,token+'\n',{mode:0o600});
+    for(const id of [...sessions.keys()])closeSession(id);
+    roots.clear();
+    for(const client of wss.clients){send(client,{type:'revoked'});setTimeout(()=>client.close(1000,'Pairing revoked'),50);}
+    return;
+   }
    if(m.type==='bind'){
     if(typeof m.workspaceId!=='string'||!/^[-\w:.]{1,160}$/.test(m.workspaceId))throw Error('Invalid workspace ID');
     const dir=validRoot(m.path,m.rootName);roots.set(m.workspaceId,dir);send(ws,{type:'bound',workspaceId:m.workspaceId,rootName:path.win32.basename(dir)});return;
