@@ -390,3 +390,30 @@ header .brand{color:#f4f0ff!important}
 
 /* opt12: Explorer anchoring and tab visibility */
 #workarea{min-height:0;overflow:hidden}#cexpSidebar{position:absolute;top:0;bottom:0;max-height:100%;overflow:hidden}#cexpTree{min-height:0;overflow-y:auto}
+
+/* opt13: Explorer is a docked column below the LOG/tab row, never an overlay.
+   Layout coordinates are measured from the actual DOM by explorer-ui.js. */
+:root{--cexp-dock-top:100px;--cexp-dock-bottom:34px;--cexp-dock-width:310px}
+body.cexp-open .app main{margin-left:var(--cexp-dock-width)!important;width:calc(100% - var(--cexp-dock-width))!important;min-width:0!important}
+body.cexp-open .app .tabs{margin-left:0!important;width:100%!important}
+.cexp-sidebar{
+ position:fixed!important;
+ left:0!important;
+ top:var(--cexp-dock-top)!important;
+ bottom:var(--cexp-dock-bottom)!important;
+ width:var(--cexp-dock-width)!important;
+ max-width:var(--cexp-dock-width)!important;
+ max-height:none!important;
+ z-index:15!important;
+ border-radius:0!important;
+ box-shadow:none!important;
+ overflow:hidden!important;
+ display:flex!important;
+ flex-direction:column!important;
+}
+.cexp-sidebar[hidden]{display:none!important}
+.cexp-sidebar #cexpTree{flex:1 1 auto;min-height:0;overflow-y:auto!important;overscroll-behavior:contain}
+@media(max-width:800px){
+ body.cexp-open .app main{margin-left:var(--cexp-dock-width)!important;width:calc(100% - var(--cexp-dock-width))!important}
+ .cexp-sidebar{z-index:15!important;box-shadow:none!important}
+}
