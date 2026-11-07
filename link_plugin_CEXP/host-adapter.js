@@ -1,8 +1,12 @@
 /* [ADD-PR18] CEXP LINK adapter; no host-internal imports. */
 (()=>{'use strict';const fm=window.cluster.fm;
  const detail=d=>({docId:d.id,handle:d.handle,name:d.name});
+ const opening=new Map();const handleKey=async h=>h.name+':'+h.kind;
+ async function sameHandle(a,b){if(a===b)return true;if(!a||!b)return false;try{return !!(await a.isSameEntry(b))}catch{return false}}
+ async function findOpen(h){for(const d of fm.docs)if(await sameHandle(d.handle,h))return d;return null}
+
  window.ClusterExplorerHost={
-  openHandle:async h=>{const existing=fm.docs.find(d=>d.handle===h);if(existing){fm.select(existing.id);return existing}return fm.open(await h.getFile(),h)},
+  openHandle:async h=>{const existing=await findOpen(h);if(existing){window.ClusterTerminal?.deactivate?.();fm.select(existing.id);return existing}const key=await handleKey(h);if(opening.has(key))return opening.get(key);const task=(async()=>{const prior=await findOpen(h);if(prior){window.ClusterTerminal?.deactivate?.();fm.select(prior.id);return prior}window.ClusterTerminal?.deactivate?.();return fm.open(await h.getFile(),h)})();opening.set(key,task);try{return await task}finally{opening.delete(key)}},
   activateDraft:async id=>fm.select(id),
   getOpenDocuments:()=>fm.docs.map(detail)
  };
@@ -21,7 +25,7 @@
   closeByDocId:id=>closeBatch(fm.docs.filter(d=>d.id===id)),
   closeByHandle:async h=>closeBatch(fm.docs.filter(d=>d.handle===h)),
   closeNodes:nodes=>closeBatch(nodes.flatMap(matching)),
-  isOpenHandle:async h=>fm.docs.some(d=>d.handle===h),
+  isOpenHandle:async h=>!!(await findOpen(h)),
   getActiveDoc:()=>fm.active?{documentId:fm.active.id,...detail(fm.active)}:null
  };
  let previous=new Map();let active=null;
