@@ -56,7 +56,15 @@ wss.on('connection',ws=>{
     fs.writeFileSync(tokenFile,token+'\n',{mode:0o600});
     for(const id of [...sessions.keys()])closeSession(id);
     roots.clear();
-    for(const client of wss.clients){send(client,{type:'revoked'});setTimeout(()=>client.close(1000,'Pairing revoked'),50);}
+    // Revoke access and terminate the local listener. Port 43879 must be released.
+    for(const client of wss.clients)send(client,{type:'revoked',portClosed:true});
+    setTimeout(()=>{
+     for(const client of wss.clients){try{client.close(1000,'Pairing revoked');}catch{}}
+     wss.close();
+     server.close(()=>process.exit(0));
+     // Do not leave a bound port behind if a socket refuses to close.
+     setTimeout(()=>process.exit(0),1500).unref();
+    },120);
     return;
    }
    if(m.type==='openExplorer'){
