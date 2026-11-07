@@ -12,7 +12,18 @@ if(!ORIGIN||!/^https:\/\/[^/]+(?:\/[^?#]*)?$/.test(ORIGIN)){
  console.error('Set CLUSTER_TERMINAL_ORIGIN to the exact GitHub Pages origin (e.g. https://account.github.io).');process.exit(1);
 }
 const allowedOrigin=new URL(ORIGIN).origin;
-const token=crypto.randomBytes(32).toString('hex');
+const configDir=path.join(process.env.LOCALAPPDATA||path.join(require('node:os').homedir(),'AppData','Local'),'ClusterTerminalAgent');
+fs.mkdirSync(configDir,{recursive:true});
+const tokenFile=path.join(configDir,'pairing-token');
+let token;
+if(fs.existsSync(tokenFile)){
+ token=fs.readFileSync(tokenFile,'utf8').trim();
+ if(!/^[a-f0-9]{64}$/.test(token))throw Error('Invalid stored pairing token');
+}else{
+ token=crypto.randomBytes(32).toString('hex');
+ fs.writeFileSync(tokenFile,token+'\n',{flag:'wx',mode:0o600});
+}
+
 const MAX_SESSIONS=8,MAX_MESSAGE=65536;
 const roots=new Map();const sessions=new Map();
 const server=http.createServer((req,res)=>{res.writeHead(404,{'Content-Type':'text/plain','Cache-Control':'no-store'});res.end('Not Found');});
@@ -66,7 +77,7 @@ wss.on('connection',ws=>{
 server.listen(PORT,'127.0.0.1',()=>{
  console.log('Cluster Terminal Agent listening on 127.0.0.1:'+PORT);
  console.log('Allowed origin: '+allowedOrigin);
- console.log('One-time pairing token (enter into Cluster UI): '+token);
+ console.log('Pairing token (keep private; persists across Agent restarts): '+token);
  console.log('Keep this window open while using terminals. Do not share the token.');
 });
 process.on('SIGINT',()=>{for(const id of [...sessions.keys()])closeSession(id);server.close(()=>process.exit(0));});
