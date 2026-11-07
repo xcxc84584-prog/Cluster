@@ -69,7 +69,7 @@ wss.on('connection',ws=>{
    }
    if(m.type==='bind'){
     if(typeof m.workspaceId!=='string'||!/^[-\w:.]{1,160}$/.test(m.workspaceId))throw Error('Invalid workspace ID');
-    if(m.workspaceId!=='cluster-drive-c'||typeof m.path!=='string'||!/^C:\\\\$/.test(m.path))throw Error('Only C:\\\\ terminal sessions are supported');
+    if(m.workspaceId!=='cluster-drive-c'||typeof m.path!=='string'||m.path.toUpperCase()!=='C:\\')throw Error('Only C:\\\\ terminal sessions are supported');
     const dir=validRoot('C:\\\\');roots.set(m.workspaceId,dir);send(ws,{type:'bound',workspaceId:m.workspaceId,rootName:path.win32.basename(dir)});return;
    }
    if(m.type==='create'){
