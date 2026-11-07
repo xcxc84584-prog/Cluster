@@ -387,3 +387,6 @@ header .brand{color:#f4f0ff!important}
 #clusterVStatus[data-state=yellow] progress{accent-color:#eab308}#clusterVStatus[data-state=red] progress{accent-color:#ef4444}
 #clusterVStatus .v-percent{font-variant-numeric:tabular-nums;font-size:10px}
 @media(max-width:650px){#clusterVStatus{min-width:100px;gap:3px}#clusterVStatus progress{width:36px}#notice{max-width:30vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+
+/* opt12: Explorer anchoring and tab visibility */
+#workarea{min-height:0;overflow:hidden}#cexpSidebar{position:absolute;top:0;bottom:0;max-height:100%;overflow:hidden}#cexpTree{min-height:0;overflow-y:auto}
