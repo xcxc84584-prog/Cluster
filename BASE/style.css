@@ -417,3 +417,24 @@ body.cexp-open .app .tabs{margin-left:0!important;width:100%!important}
  body.cexp-open .app main{margin-left:var(--cexp-dock-width)!important;width:calc(100% - var(--cexp-dock-width))!important}
  .cexp-sidebar{z-index:15!important;box-shadow:none!important}
 }
+
+/* opt14: structural Explorer docking. Explorer is a CHILD of main, not a floating overlay.
+   Main flex layout guarantees the terminal/editor/log remain separate. */
+#workarea{display:flex!important;flex-direction:row!important;align-items:stretch!important;min-height:0!important;overflow:hidden!important}
+#workarea > #cexpSidebar{
+ position:relative!important;inset:auto!important;top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;
+ flex:0 0 310px!important;width:310px!important;max-width:310px!important;
+ height:100%!important;max-height:100%!important;min-height:0!important;
+ z-index:auto!important;overflow:hidden!important;box-shadow:none!important;
+ border-radius:0!important;display:flex!important;flex-direction:column!important;
+}
+#workarea > #cexpSidebar[hidden]{display:none!important}
+body.cexp-open .app main,body.cexp-open .app .tabs{margin-left:0!important;width:100%!important}
+#workarea > #clusterTerminalPanel{flex:1 1 0!important;min-width:0!important;width:auto!important;height:100%!important}
+#workarea > #editorShell,#workarea > #localRangeView{flex:1 1 0!important;min-width:0!important;width:auto!important;height:100%!important}
+#workarea > #empty{left:0;right:0}
+body.cexp-open #workarea > #empty{left:310px!important}
+@media(max-width:550px){
+ #workarea > #cexpSidebar{flex-basis:min(310px,55vw)!important;width:min(310px,55vw)!important;max-width:min(310px,55vw)!important}
+ body.cexp-open #workarea > #empty{left:min(310px,55vw)!important}
+}
