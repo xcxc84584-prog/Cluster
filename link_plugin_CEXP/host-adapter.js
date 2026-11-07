@@ -1,7 +1,7 @@
 /* [ADD-PR18] CEXP LINK adapter; no host-internal imports. */
 (()=>{'use strict';const fm=window.cluster.fm;
  const detail=d=>({docId:d.id,handle:d.handle,name:d.name});
- const opening=new Map();const handleKey=async h=>h.name+':'+h.kind;
+ const opening=new Map();const handleKey=async h=>h;
  async function sameHandle(a,b){if(a===b)return true;if(!a||!b)return false;try{return !!(await a.isSameEntry(b))}catch{return false}}
  async function findOpen(h){for(const d of fm.docs)if(await sameHandle(d.handle,h))return d;return null}
 
