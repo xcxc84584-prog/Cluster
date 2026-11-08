@@ -4,6 +4,25 @@
 const SLICE_BYTES=250*1024;
 const decoder=new TextDecoder('utf-8');
 const encoder=new TextEncoder();
+const legacyEncodings=['utf-8','gb18030','big5'];
+function detectEncoding(bytes){
+ const sample=bytes.subarray(0,Math.min(bytes.length,65536));
+ if(sample.length>=3&&sample[0]===0xef&&sample[1]===0xbb&&sample[2]===0xbf)return 'utf-8';
+ try{new TextDecoder('utf-8',{fatal:true}).decode(sample);return 'utf-8'}catch{}
+ // Both decoders replace some malformed sequences; compare replacement counts.
+ let best='gb18030',score=-Infinity;
+ for(const label of ['gb18030','big5']){
+  try{
+   const decoded=new TextDecoder(label).decode(sample);
+   const replacements=(decoded.match(/\uFFFD/g)||[]).length;
+   const controls=(decoded.match(/[\u0000-\u0008\u000E-\u001F]/g)||[]).length;
+   const value=-(replacements*10+controls);
+   if(value>score){score=value;best=label}
+  }catch{}
+ }
+ return best;
+}
+
 function setDocStatus(doc,kind,detail,progress){
  if(!doc)return;
  doc.saveState={kind,detail,progress:Math.max(0,Math.min(100,progress))};
@@ -11,10 +30,10 @@ function setDocStatus(doc,kind,detail,progress){
 }
 function showActiveStatus(doc){const x=doc?.saveState||{kind:'green',detail:'未選取文件',progress:100};ClusterVJournal.status(x.kind,x.detail,x.progress)}
 class SegmentDocument {
- constructor(file,emit=()=>{}){this.file=file;this.emit=emit;this.id=crypto.randomUUID();this.name=file.name;this.size=file.size;this.version=0;this.nodes=[];this.changes=[];this.blocks=new Map();this.blockAnchors=new Map();this.nextBlock=1;this.lineStarts=[0];this.indexedBytes=0;this.indexedLines=1;this.indexComplete=false;this.cache=new Map();this.cacheLimit=12;this.indexing=false;this.mutations=[];this.vOperations=[];this.vRevision=0;this.vKey=null;this.vError=null;this.saveState={kind:"green",detail:"已同步",progress:100};this.indexPromise=null;this.saveBusy=false;}  
- async init(){const n=Math.max(1,Math.ceil(this.size/SLICE_BYTES));for(let i=0;i<n;i++){const start=i*SLICE_BYTES,end=Math.min(this.size,start+SLICE_BYTES);this.nodes.push({id:i,start,end,prev:i?i-1:null,next:i+1<n?i+1:null});if(i===n-1||i%128===0)this.emit('SegmentLoader',`Load "${this.name}",Slice:${Math.ceil(end/1024)}/${Math.ceil(this.size/1024)}KB`)}this.emit('SegmentLoader','Sliced loading successfully established.');return this}
- async getSlice(i){if(i<0||i>=this.nodes.length)return '';if(this.cache.has(i))return this.cache.get(i);const node=this.nodes[i];const text=decoder.decode(await this.file.slice(node.start,node.end).arrayBuffer());this.cache.set(i,text);if(this.cache.size>this.cacheLimit)this.cache.delete(this.cache.keys().next().value);return text}
- async textRange(start,end){start=Math.max(0,start);end=Math.min(this.size,end);if(end<=start)return '';return decoder.decode(await this.file.slice(start,end).arrayBuffer())}
+ constructor(file,emit=()=>{}){this.file=file;this.emit=emit;this.id=crypto.randomUUID();this.name=file.name;this.size=file.size;this.version=0;this.nodes=[];this.changes=[];this.blocks=new Map();this.blockAnchors=new Map();this.nextBlock=1;this.lineStarts=[0];this.indexedBytes=0;this.indexedLines=1;this.indexComplete=false;this.cache=new Map();this.cacheLimit=12;this.indexing=false;this.mutations=[];this.vOperations=[];this.vRevision=0;this.vKey=null;this.vError=null;this.saveState={kind:"green",detail:"已同步",progress:100};this.indexPromise=null;this.saveBusy=false;this.encoding='utf-8';this.encodingWarning=false;}  
+ async init(){this.encoding=detectEncoding(new Uint8Array(await this.file.slice(0,65536).arrayBuffer()));this.encodingWarning=this.encoding!=='utf-8';if(this.encodingWarning)this.emit('SegmentLoader',this.name+': 偵測到 '+this.encoding+'，僅允許唯讀以防止中文毀損');const n=Math.max(1,Math.ceil(this.size/SLICE_BYTES));for(let i=0;i<n;i++){const start=i*SLICE_BYTES,end=Math.min(this.size,start+SLICE_BYTES);this.nodes.push({id:i,start,end,prev:i?i-1:null,next:i+1<n?i+1:null});if(i===n-1||i%128===0)this.emit('SegmentLoader',`Load "${this.name}",Slice:${Math.ceil(end/1024)}/${Math.ceil(this.size/1024)}KB`)}this.emit('SegmentLoader','Sliced loading successfully established.');return this}
+ async getSlice(i){if(i<0||i>=this.nodes.length)return '';if(this.cache.has(i))return this.cache.get(i);const node=this.nodes[i];const text=new TextDecoder(this.encoding).decode(await this.file.slice(node.start,node.end).arrayBuffer());this.cache.set(i,text);if(this.cache.size>this.cacheLimit)this.cache.delete(this.cache.keys().next().value);return text}
+ async textRange(start,end){start=Math.max(0,start);end=Math.min(this.size,end);if(end<=start)return '';return new TextDecoder(this.encoding).decode(await this.file.slice(start,end).arrayBuffer())}
  async index(onProgress=()=>{}){if(this.indexing)return;this.indexing=true;let offset=0,carryCR=false;const block=1024*1024;try{while(offset<this.size){const end=Math.min(this.size,offset+block);const bytes=new Uint8Array(await this.file.slice(offset,end).arrayBuffer());for(let i=0;i<bytes.length;i++){if(bytes[i]===10)this.lineStarts.push(offset+i+1)}offset=end;this.indexedBytes=offset;this.indexedLines=this.lineStarts.length;onProgress(offset/Math.max(1,this.size));if(offset%(8*block)===0)await new Promise(r=>setTimeout(r,0))}this.indexComplete=true;this.emit('SegmentLoader',`Index complete,lines:${this.lineStarts.length}`)}catch(e){this.emit('SegmentLoader',`ERROR PR6:001 ${e.message}`);throw e}finally{this.indexing=false}}
  async getLines(first,count){
   if(!this.indexComplete&&first>this.indexedLines)throw Error('行號索引尚未完成');
@@ -57,7 +76,7 @@ class SegmentDocument {
   return lines;
  }
  async getBaseWindowLines(first,count){const begin=this.lineStarts[first-1]??this.size;const end=this.lineStarts[first+count-1]??this.size;return (await this.textRange(begin,end)).split('\n').slice(0,count).map(x=>x.replace(/\r$/,''))}
- async getAllSmall(){return this.file.text()}
+ async getAllSmall(){return new TextDecoder(this.encoding).decode(await this.file.arrayBuffer())}
  async replaceLines(start,end,newText){if(!this.indexComplete)throw Error('需等待索引完成');if(start<1||end<start||end>this.lineStarts.length)throw Error('行號範圍無效');const old=await this.getLines(start,end-start+1);const before=this.lineStarts[start-1];const after=this.lineStarts[end]??this.size;const replacement=newText+(after<this.size?'\n':'');this.mutations.push({start:before,end:after,text:replacement,old:old.join('\n')});this.mutations.sort((a,b)=>a.start-b.start);this.version++;const delta=newText.split('\n').length-(end-start+1);for(const block of this.blocks.values()){if(block.start> end){block.start+=delta;block.end+=delta}else if(block.end>=start){block.end+=delta;if(block.start>start)block.start=start}}return {delta,version:this.version}}
  async createBlock(start,end){if(!this.indexComplete)throw Error('索引尚未完成');if(start<1||end<start||end>this.lineStarts.length)throw Error('範圍無效');const id='B'+String(this.nextBlock++).padStart(4,'0');const content=(await this.getLines(start,end-start+1)).join('\n');const block={id,start,end,content};this.blocks.set(id,block);return block}
  async checkBlock(id){const b=this.blocks.get(id);if(!b)throw Error('Block ID 不存在');return {...b,content:(await this.getLines(b.start,b.end-b.start+1)).join('\n')}}
@@ -94,7 +113,7 @@ try{doc.vKey=await ClusterVJournal.fingerprint(file);const record=await ClusterV
  async create(){return this.open(new File([''],'未命名.txt',{type:'text/plain'}))}
  select(id){this.active=this.docs.find(x=>x.id===id)||null;showActiveStatus(this.active);this.notify();window.dispatchEvent(new Event('cluster:tab-change'))}
  close(id){this.docs=this.docs.filter(x=>x.id!==id);if(this.active?.id===id)this.active=this.docs.at(-1)||null;showActiveStatus(this.active);this.notify();window.dispatchEvent(new CustomEvent('cluster:file-close',{detail:{id}}))}
- async save(doc=this.active,saveAs=false,forceMerge=false){if(!doc)throw Error('沒有文件');if(doc.vError)throw Error('V 日誌異常，禁止覆寫原始文件');if(doc.saveBusy)throw Error('此文件已有儲存工作進行中');doc.saveBusy=true;try{if(doc.size>=100000&&doc.vOperations.length){
+ async save(doc=this.active,saveAs=false,forceMerge=false){if(!doc)throw Error('沒有文件');if(doc.encodingWarning)throw Error('此文件使用 '+doc.encoding+' 編碼，目前禁止儲存以避免中文字損毀。請先轉換原始檔為 UTF-8 後重新開啟。');if(doc.vError)throw Error('V 日誌異常，禁止覆寫原始文件');if(doc.saveBusy)throw Error('此文件已有儲存工作進行中');doc.saveBusy=true;try{if(doc.size>=100000&&doc.vOperations.length){
   if(!doc.indexComplete)throw Error('行號索引尚未完成');
   // Derive minimal edits against immutable Base instead of treating each
   // overlapping viewport as a conflicting full-window replacement.
