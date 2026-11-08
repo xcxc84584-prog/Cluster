@@ -11,3 +11,7 @@ body.cluster-ai-active #clusterAiPanel:not([hidden]){display:flex!important}
 
 /* AI surface is visible only while selected; keep the tab when switching. */
 body:not(.cluster-ai-active) #clusterAiPanel{display:none!important}
+
+/* P3: AI Agent is a status console, not a chat client. */
+#caiForm,#caiSettings,#caiStop,#caiProvider{display:none!important}
+#caiWorkspace .cai-feed{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
