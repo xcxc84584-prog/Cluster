@@ -74,6 +74,8 @@ const server=http.createServer(async(req,res)=>{
    pending.delete(ticket);
    const code=random();codes.set(code,{...p,expires:now()+60000});
    const target=new URL(p.uri);target.searchParams.set('code',code);target.searchParams.set('state',p.state);
+   // Only log the callback route, never the authorization code, state, or password.
+   console.log('[OAuth] Approval accepted; redirecting to callback:',target.origin+target.pathname);
    return redirect(res,target.href);
   }
   if(route==='/token'&&req.method==='POST'){
