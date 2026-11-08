@@ -455,3 +455,26 @@ body.cexp-open .app main,body.cexp-open .app .tabs{margin-left:0!important;width
 
 /* opt19: press and hold a tab for 450ms, then move horizontally to reorder */
 #tabList .tab.cluster-tab-dragging{opacity:.7;outline:1px solid #a0a0a0;background:#252525;cursor:grabbing;z-index:2}#tabList .tab{touch-action:pan-x}
+
+/* Fix: reserve real layout space for the bottom toolbar instead of letting it
+   overlap the last editable line. Applies to both small and sliced documents. */
+#editorShell.editor-shell{
+ box-sizing:border-box;
+ padding-bottom:42px;
+ min-height:0;
+}
+#editorShell.editor-shell > #editor,
+#editorShell.editor-shell > #gutter{
+ box-sizing:border-box;
+ height:100%!important;
+ min-height:0;
+ margin-bottom:0!important;
+}
+#editorShell.editor-shell > #clusterBottomBar{
+ position:absolute;
+ bottom:0;
+ left:0;
+ right:0;
+ box-sizing:border-box;
+ height:42px;
+}
