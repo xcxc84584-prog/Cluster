@@ -42,6 +42,38 @@ function languageForFile(name){
  const suffix=Object.keys(rules).filter(x=>lower.endsWith(x)).sort((a,b)=>b.length-a.length)[0];
  return suffix?rules[suffix]:'none';
 }
+let pageActive=false;
+function setupSyntaxPage(){
+ const page=document.getElementById('syntaxEditorPage'),button=document.getElementById('syntaxOpenPage');
+ const tabs=document.getElementById('tabList'),shell=document.getElementById('editorShell'),empty=document.getElementById('empty');
+ if(!page||!button||!tabs||!shell||!empty)return;
+ function sync(){
+  let tab=tabs.querySelector('[data-tab-key="plugin:syntax"]');
+  if(!tab&&pageActive){
+   tab=document.createElement('div');tab.className='tab';tab.dataset.tabKey='plugin:syntax';
+   const open=document.createElement('button');open.type='button';open.className='tab-select';open.textContent='🎨 Syntax Highlighter';
+   open.onclick=activate;
+   const close=document.createElement('button');close.type='button';close.className='tab-close';close.textContent='×';close.onclick=deactivate;
+   tab.append(open,close);tabs.append(tab);
+  }
+  if(tab)tab.classList.toggle('is-active',pageActive);
+  page.hidden=!pageActive;
+  if(pageActive){shell.hidden=true;empty.hidden=true;document.getElementById('clusterBottomBar').hidden=true}
+ }
+ function activate(){
+  pageActive=true;window.ClusterTerminal?.deactivate?.();
+  document.getElementById('fileMenu').hidden=true;sync();
+ }
+ function deactivate(){
+  pageActive=false;page.hidden=true;
+  const tab=tabs.querySelector('[data-tab-key="plugin:syntax"]');tab?.remove();
+  shell.hidden=!window.cluster?.fm?.active;
+  empty.hidden=!!window.cluster?.fm?.active;
+  document.getElementById('clusterBottomBar').hidden=!window.cluster?.fm?.active;
+ }
+ button.onclick=activate;
+ window.ClusterSyntaxPage={activate,deactivate,sync};
+}
 function setupTools(){
  const input=document.getElementById('syntaxExtInput'),select=document.getElementById('syntaxLangSelect');
  const status=document.getElementById('syntaxExtStatus'),entries=document.getElementById('syntaxExtEntries');
@@ -150,5 +182,5 @@ const check=()=>{
 window.clusterSyntax={refresh:schedule,dispose(){clearTimeout(timer);++seq;overlay.remove();shell.classList.remove('syntax-enabled')}};
 window.addEventListener('focus',check);
 document.addEventListener('click',check,true);
-setupTools();align();schedule();
+setupSyntaxPage();setupTools();align();schedule();
 })();
