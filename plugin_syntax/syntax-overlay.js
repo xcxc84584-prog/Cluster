@@ -11,8 +11,70 @@ const code=document.createElement('pre');
 code.id='clusterSyntaxCode';
 overlay.append(code);shell.insertBefore(overlay,editor);
 const languages={c:'c',h:'c',ino:'cpp',bak:'cpp',cc:'cpp',cpp:'cpp',cxx:'cpp',hpp:'cpp',hxx:'cpp',py:'python',js:'javascript',mjs:'javascript',cjs:'javascript',ts:'typescript',tsx:'tsx',jsx:'jsx',html:'markup',htm:'markup',xml:'markup',css:'css',json:'json',md:'markdown',ps1:'powershell',java:'java',rs:'rust',go:'go',sh:'bash',sql:'sql'};
+const STORAGE_KEY='cluster.syntax.extensions.v1';
+const defaults={...languages};
+const supported=['c','cpp','python','javascript','typescript','jsx','tsx','markup','css','json','markdown','powershell','java','rust','go','bash','sql'];
+function normalizeSuffix(value){
+ const v=String(value||'').trim().toLowerCase().replace(/^\*+/,'');
+ const suffix=v.startsWith('.')?v:'.'+v;
+ if(!/^\.[a-z0-9_-]+(?:\.[a-z0-9_-]+)*$/.test(suffix)||suffix.length>40)throw Error('無效後綴 / Invalid suffix');
+ return suffix;
+}
+function readRules(){
+ try{
+  const stored=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');
+  if(stored&&typeof stored==='object'&&!Array.isArray(stored)){
+   const rules={};
+   for(const [key,val] of Object.entries(stored)){
+    try{const ext=normalizeSuffix(key);if(supported.includes(val))rules[ext]=val}catch{}
+   }
+   return rules;
+  }
+ }catch{}
+ return Object.fromEntries(Object.entries(defaults).map(([ext,lang])=>['.'+ext,lang]));
+}
+let rules=readRules();
+function saveRules(){
+ localStorage.setItem(STORAGE_KEY,JSON.stringify(rules));
+}
+function languageForFile(name){
+ const lower=String(name||'').toLowerCase();
+ const suffix=Object.keys(rules).filter(x=>lower.endsWith(x)).sort((a,b)=>b.length-a.length)[0];
+ return suffix?rules[suffix]:'none';
+}
+function setupTools(){
+ const input=document.getElementById('syntaxExtInput'),select=document.getElementById('syntaxLangSelect');
+ const status=document.getElementById('syntaxExtStatus'),entries=document.getElementById('syntaxExtEntries');
+ if(!input||!select||!status||!entries)return;
+ for(const lang of supported){
+  const option=document.createElement('option');option.value=lang;option.textContent=lang;select.append(option);
+ }
+ const show=()=>{
+  entries.replaceChildren();
+  for(const [ext,lang] of Object.entries(rules).sort(([a],[b])=>a.localeCompare(b))){
+   const item=document.createElement('button');item.type='button';item.className='syntax-ext-entry';
+   item.textContent=ext+'  →  '+lang;
+   item.onclick=()=>{input.value=ext;select.value=lang;status.textContent='已選擇 / Selected: '+ext};
+   entries.append(item);
+  }
+  if(!entries.childElementCount)entries.textContent='尚無規則 / No rules';
+ };
+ const report=msg=>{status.textContent=msg;show();schedule()};
+ document.getElementById('syntaxExtAdd')?.addEventListener('click',()=>{
+  try{const suffix=normalizeSuffix(input.value),lang=select.value;if(!supported.includes(lang))throw Error('不支援的語言 / Unsupported language');
+   rules[suffix]=lang;saveRules();report('已新增 / Added: '+suffix+' → '+lang);
+  }catch(e){status.textContent=e.message}
+ });
+ document.getElementById('syntaxExtRemove')?.addEventListener('click',()=>{
+  try{const suffix=normalizeSuffix(input.value);if(!(suffix in rules))throw Error('找不到後綴 / Extension not found');
+   delete rules[suffix];saveRules();report('已刪除 / Removed: '+suffix);
+  }catch(e){status.textContent=e.message}
+ });
+ document.getElementById('syntaxExtList')?.addEventListener('click',()=>{show();status.textContent='已列出 '+Object.keys(rules).length+' 筆 / '+Object.keys(rules).length+' rules listed'});
+ show();
+}
 let active=false,seq=0,timer=0,lastDoc=null;
-const getLanguage=d=>{const name=d?.name||'';const ext=name.split('.').pop().toLowerCase();if(ext==='bak'){const previous=name.slice(0,-4).split('.').pop().toLowerCase();return languages[previous]||'cpp'}return languages[ext]||'none'};
+const getLanguage=d=>languageForFile(d?.name);
 function align(){
  const s=getComputedStyle(editor);
  overlay.style.left=editor.offsetLeft+'px';overlay.style.top=editor.offsetTop+'px';
@@ -88,5 +150,5 @@ const check=()=>{
 window.clusterSyntax={refresh:schedule,dispose(){clearTimeout(timer);++seq;overlay.remove();shell.classList.remove('syntax-enabled')}};
 window.addEventListener('focus',check);
 document.addEventListener('click',check,true);
-align();schedule();
+setupTools();align();schedule();
 })();
