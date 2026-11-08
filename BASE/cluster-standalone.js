@@ -16,7 +16,61 @@ class SegmentDocument {
  async getSlice(i){if(i<0||i>=this.nodes.length)return '';if(this.cache.has(i))return this.cache.get(i);const node=this.nodes[i];const text=decoder.decode(await this.file.slice(node.start,node.end).arrayBuffer());this.cache.set(i,text);if(this.cache.size>this.cacheLimit)this.cache.delete(this.cache.keys().next().value);return text}
  async textRange(start,end){start=Math.max(0,start);end=Math.min(this.size,end);if(end<=start)return '';return decoder.decode(await this.file.slice(start,end).arrayBuffer())}
  async index(onProgress=()=>{}){if(this.indexing)return;this.indexing=true;let offset=0,carryCR=false;const block=1024*1024;try{while(offset<this.size){const end=Math.min(this.size,offset+block);const bytes=new Uint8Array(await this.file.slice(offset,end).arrayBuffer());for(let i=0;i<bytes.length;i++){if(bytes[i]===10)this.lineStarts.push(offset+i+1)}offset=end;this.indexedBytes=offset;this.indexedLines=this.lineStarts.length;onProgress(offset/Math.max(1,this.size));if(offset%(8*block)===0)await new Promise(r=>setTimeout(r,0))}this.indexComplete=true;this.emit('SegmentLoader',`Index complete,lines:${this.lineStarts.length}`)}catch(e){this.emit('SegmentLoader',`ERROR PR6:001 ${e.message}`);throw e}finally{this.indexing=false}}
- async getLines(first,count){if(this.vOperations.length){const overlay=[...this.vOperations].reverse().find(x=>x.kind==='window'&&x.start===first&&x.count===count);if(overlay)return overlay.text.split('\n')} if(!this.indexComplete&&first>this.indexedLines)throw Error('行號索引尚未完成');const start=this.lineStarts[Math.max(0,first-1)]??this.size;/* [FIX-PR1-001] End of requested line window is EOF when no subsequent newline exists. */const nextLineIndex=first+count-1;const end=nextLineIndex<this.lineStarts.length?this.lineStarts[nextLineIndex]:this.size;let text=await this.textRange(start,end);let lines=text.split('\n');return lines.slice(0,count).map(s=>s.endsWith('\r')?s.slice(0,-1):s)}
+ // Base is immutable. The V journal describes replacement windows in Base
+ // coordinates; their newline deltas shift all subsequent visible line numbers.
+ getVWindows(){
+  const latest=new Map();
+  for(const op of this.vOperations)if(op.kind==='window'&&Number.isInteger(op.start)&&Number.isInteger(op.count)&&op.count>0)
+   latest.set(op.start+':'+op.count,op);
+  const windows=[...latest.values()].sort((a,b)=>a.start-b.start);
+  let previousEnd=0,delta=0;
+  for(const op of windows){
+   if(op.start<previousEnd)throw Error('V 視窗原始區間重疊，無法安全計算行號');
+   const originalCount=Math.min(op.count,Math.max(0,this.lineStarts.length-op.start+1));
+   if(!originalCount)throw Error('V 視窗超出原始文件行號');
+   op.viewStart=op.start+delta;
+   op.viewCount=op.text.split('\\n').length;
+   op.viewEnd=op.viewStart+op.viewCount-1;
+   op.baseEnd=op.start+originalCount-1;
+   delta+=op.viewCount-originalCount;
+   previousEnd=op.baseEnd+1;
+  }
+  return {windows,total:this.lineStarts.length+delta};
+ }
+ getViewLineCount(){return this.indexComplete?this.getVWindows().total:this.indexedLines;}
+ async getBaseLines(first,count){
+  if(!this.indexComplete&&first>this.indexedLines)throw Error('行號索引尚未完成');
+  if(count<=0)return [];
+  const from=this.lineStarts[Math.max(0,first-1)]??this.size;
+  const endIndex=first+count-1;
+  const to=endIndex<this.lineStarts.length?this.lineStarts[endIndex]:this.size;
+  const text=await this.textRange(from,to);
+  return text.split('\\n').slice(0,count).map(x=>x.endsWith('\\r')?x.slice(0,-1):x);
+ }
+ async getLines(first,count){
+  if(!this.indexComplete&&first>this.indexedLines)throw Error('行號索引尚未完成');
+  if(!this.indexComplete||!this.vOperations.some(x=>x.kind==='window'))return this.getBaseLines(first,count);
+  const {windows,total}=this.getVWindows(),result=[];
+  let cursor=Math.max(1,first),wi=0,delta=0;
+  const limit=Math.min(total,first+count-1);
+  while(cursor<=limit){
+   while(wi<windows.length&&windows[wi].viewEnd<cursor){
+    const op=windows[wi++];
+    delta+=(op.viewCount-(op.baseEnd-op.start+1));
+   }
+   const op=windows[wi];
+   if(op&&cursor>=op.viewStart){
+    const content=op.text.split('\\n'),offset=cursor-op.viewStart;
+    const take=Math.min(limit-cursor+1,content.length-offset);
+    result.push(...content.slice(offset,offset+take));cursor+=take;
+   }else{
+    const until=op?Math.min(limit,op.viewStart-1):limit;
+    const take=until-cursor+1;
+    result.push(...await this.getBaseLines(cursor-delta,take));cursor+=take;
+   }
+  }
+  return result;
+ }
  async getAllSmall(){return this.file.text()}
  async replaceLines(start,end,newText){if(!this.indexComplete)throw Error('需等待索引完成');if(start<1||end<start||end>this.lineStarts.length)throw Error('行號範圍無效');const old=await this.getLines(start,end-start+1);const before=this.lineStarts[start-1];const after=this.lineStarts[end]??this.size;const replacement=newText+(after<this.size?'\n':'');this.mutations.push({start:before,end:after,text:replacement,old:old.join('\n')});this.mutations.sort((a,b)=>a.start-b.start);this.version++;const delta=newText.split('\n').length-(end-start+1);for(const block of this.blocks.values()){if(block.start> end){block.start+=delta;block.end+=delta}else if(block.end>=start){block.end+=delta;if(block.start>start)block.start=start}}return {delta,version:this.version}}
  async createBlock(start,end){if(!this.indexComplete)throw Error('索引尚未完成');if(start<1||end<start||end>this.lineStarts.length)throw Error('範圍無效');const id='B'+String(this.nextBlock++).padStart(4,'0');const content=(await this.getLines(start,end-start+1)).join('\n');const block={id,start,end,content};this.blocks.set(id,block);return block}
@@ -50,7 +104,7 @@ class FileManager {
  onChange(fn){this.listeners.add(fn);return()=>this.listeners.delete(fn)}
  notify(){for(const fn of this.listeners)fn(this)}
  async open(file,handle=null){const doc=await new SegmentDocument(file,this.emit).init();doc.handle=handle;doc.dirty=false;
-try{doc.vKey=await ClusterVJournal.fingerprint(file);const record=await ClusterVJournal.read(doc.vKey);if(record?.operations?.length){const accept=confirm(`找到 ${file.name} 的 ${record.operations.length} 筆尚未同步 V 操作。\n確定：載入 V 並顯示合成版本（不寫入原始文件）\n取消：捨棄 V 操作`);if(accept){doc.vOperations=record.operations;doc.vRevision=record.revision;doc.dirty=true;doc.mutations=record.mutations||[];setDocStatus('yellow','已恢復 V，等待主動儲存',100)}else{await ClusterVJournal.remove(doc.vKey);setDocStatus('green','已捨棄 V，使用原始文件',100)}}else setDocStatus('green','原始文件與 V 同步',100)}catch(e){doc.vError=e;setDocStatus('red','無法讀取 V：'+e.message,0)}this.docs.push(doc);this.active=doc;showActiveStatus(doc);this.notify();window.dispatchEvent(new CustomEvent('cluster:file-open',{detail:{doc}}));return doc}
+try{doc.vKey=await ClusterVJournal.fingerprint(file);const record=await ClusterVJournal.read(doc.vKey);if(record?.operations?.length){const accept=confirm('是否還原上次未提交編輯 (Y)/(N)');if(accept){doc.vOperations=record.operations;doc.vRevision=record.revision;doc.dirty=true;doc.mutations=record.mutations||[];setDocStatus('yellow','已恢復 V，等待主動儲存',100)}else{await ClusterVJournal.remove(doc.vKey);setDocStatus('green','已捨棄 V，使用原始文件',100)}}else setDocStatus('green','原始文件與 V 同步',100)}catch(e){doc.vError=e;setDocStatus('red','無法讀取 V：'+e.message,0)}this.docs.push(doc);this.active=doc;showActiveStatus(doc);this.notify();window.dispatchEvent(new CustomEvent('cluster:file-open',{detail:{doc}}));return doc}
  async create(){return this.open(new File([''],'未命名.txt',{type:'text/plain'}))}
  select(id){this.active=this.docs.find(x=>x.id===id)||null;showActiveStatus(this.active);this.notify();window.dispatchEvent(new Event('cluster:tab-change'))}
  close(id){this.docs=this.docs.filter(x=>x.id!==id);if(this.active?.id===id)this.active=this.docs.at(-1)||null;showActiveStatus(this.active);this.notify();window.dispatchEvent(new CustomEvent('cluster:file-close',{detail:{id}}))}
@@ -147,21 +201,21 @@ const lineHeight=()=>{const st=getComputedStyle(editor);return parseFloat(st.lin
 const centerLine=(localLine)=>{const h=lineHeight(),visible=Math.max(1,Math.floor(editor.clientHeight/h));editor.scrollTop=Math.max(0,(localLine-1-(visible-1)/2)*h);gutter.scrollTop=editor.scrollTop};
 $('clusterGoLine').onclick=async()=>{const d=fm.active;if(!d)return;const n=Number($('clusterLine').value);if(!Number.isInteger(n)||n<1){emit('SegmentLoader','ERROR PR8:001 Invalid line');return}
  try{if(d.size<100000){const lines=editor.value.split('\n');if(n>lines.length)throw Error('Line out of range');const pos=lines.slice(0,n-1).join('\n').length+(n>1?1:0);editor.focus();editor.setSelectionRange(pos,pos);centerLine(n);return}
- if(!d.indexComplete||n>d.lineStarts.length)throw Error('Index unavailable or out of range');
+ if(!d.indexComplete||n>d.getViewLineCount())throw Error('Index unavailable or out of range');
  const visible=Math.max(5,Math.ceil(editor.clientHeight/lineHeight()));const before=Math.max(visible,Math.floor(count/3));await flushV(d);start=Math.max(1,n-before);await render();
  const local=n-start+1;const lines=editor.value.split('\n');const pos=lines.slice(0,local-1).join('\n').length+(local>1?1:0);editor.focus();editor.setSelectionRange(pos,pos);centerLine(local);
  // Preload adjacent byte slices in background without changing the viewport.
- const offset=d.lineStarts[n-1]||0;const slice=Math.floor(offset/(250*1024));Promise.all([slice-1,slice,slice+1].filter(i=>i>=0&&i<d.nodes.length).map(i=>d.getSlice(i))).catch(e=>emit('SegmentLoader',`PREFETCH ERROR ${e.message}`));
+ const offset=d.lineStarts[Math.min(n-1,d.lineStarts.length-1)]||0;const slice=Math.floor(offset/(250*1024));Promise.all([slice-1,slice,slice+1].filter(i=>i>=0&&i<d.nodes.length).map(i=>d.getSlice(i))).catch(e=>emit('SegmentLoader',`PREFETCH ERROR ${e.message}`));
  emit('SegmentLoader',`Goto line ${n}, viewport center, adjacent slices prefetched`);
  }catch(e){emit('SegmentLoader','ERROR PR8:001 '+e.message)}
 };
 $('clusterLocalEdit').onclick=()=>{const d=fm.active;if(!d)return;const n=Number($('clusterLine').value)||1;void flushV(d).then(()=>{start=Math.max(1,n);return render()})};
-editor.addEventListener('input',()=>{const d=fm.active;if(!d)return;d.dirty=true;if(d.size<100000){d.syncSmallBlocks(lastSmallText,editor.value);lastSmallText=editor.value;d.mutations=[{start:0,end:d.size,text:editor.value}];d.version++;queueV(d,{kind:'small',text:editor.value});refreshSmallGutter();updateBlockDirectory()}else{d.pendingView={start,end:Math.min(d.lineStarts.length,start+count-1),text:editor.value};queueV(d,{kind:'window',start,count,text:editor.value})};tabs()});
+editor.addEventListener('input',()=>{const d=fm.active;if(!d)return;d.dirty=true;if(d.size<100000){d.syncSmallBlocks(lastSmallText,editor.value);lastSmallText=editor.value;d.mutations=[{start:0,end:d.size,text:editor.value}];d.version++;queueV(d,{kind:'small',text:editor.value});refreshSmallGutter();updateBlockDirectory()}else{d.pendingView={start,end:Math.min(d.getViewLineCount(),start+count-1),text:editor.value};queueV(d,{kind:'window',start,count,text:editor.value})};tabs()});
 // [OPT2] Virtual page scrolling: shift logical windows when reaching either edge.
 let pageShiftBusy=false;
 async function shiftWindow(direction){
  const d=fm.active;if(!d||d.size<100000||!d.indexComplete||pageShiftBusy||editor.disabled)return;
- const maxStart=Math.max(1,d.lineStarts.length-count+1);
+ const maxStart=Math.max(1,d.getViewLineCount()-count+1);
  const next=Math.max(1,Math.min(maxStart,start+direction*Math.max(25,Math.floor(count/2))));
  if(next===start)return;
  pageShiftBusy=true;
