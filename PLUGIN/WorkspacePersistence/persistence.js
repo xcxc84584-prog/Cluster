@@ -8,11 +8,11 @@
  async function checkpoint(){if(restoring)return;const active=fm.active;const records=[];
   for(const d of fm.docs){const id=key(d),small=d.size<100000;let content=null;
    if(small){content=d===active?el.value:d.mutations.at(-1)?.text??await d.file.text();}
-   const blocks=[...d.blocks.values()];records.push({id,name:d.name,size:d.size,lastModified:d.file.lastModified,handle:d.handle||null,content,blocks,nextBlock:d.nextBlock,viewportStart:d._viewportStart||((d===active)?window.ClusterWorkspaceViewport?.get?.():1)||1});
+   const blocks=[...d.blocks.values()];records.push({id,name:d.name,size:d.size,lastModified:d.file.lastModified,handle:d.handle||null,content,blocks,nextBlock:d.nextBlock,viewportStart:(d===active?window.ClusterWorkspaceViewport?.get?.():d._viewportStart)||1});
    await save('documents',id,records.at(-1));
    if(d.indexComplete&&d.size>=100000&&!d.dirty&&d.lineStarts.length<1000000){await save('indexes',id,{size:d.size,lastModified:d.file.lastModified,lines:d.lineStarts});}
   }
-  const line=active?el.value.slice(0,el.selectionStart).split('\n').length:1;
+  const line=active?(active.size>=100000?(window.ClusterWorkspaceViewport?.get?.()||1)+el.value.slice(0,el.selectionStart).split('\n').length-1:el.value.slice(0,el.selectionStart).split('\n').length):1;
   await save('session','current',{ids:records.map(x=>x.id),active:active?key(active):null,line,selection:el.selectionStart,scroll:el.scrollTop});
   // [FIX-PR13] Checkpoint is durable recovery state, NOT a disk commit.
   // Disk write is scheduled separately after an idle period and rechecks document identity/version.
