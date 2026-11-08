@@ -37,7 +37,7 @@ const lang=()=>$('uiLanguage')?.value==='en'?'en':'zh';
 const panel=document.createElement('section');panel.id='clusterDevelopmentPanel';panel.hidden=true;panel.className='cluster-terminal-panel';
 panel.style.cssText='overflow:auto;padding:20px;background:#101116;color:#eee;position:absolute;inset:0;z-index:8';
 host.append(panel);
-const tab=document.createElement('div');tab.className='tab cluster-dev-tab';tab.style.display='none';const tabSelect=document.createElement('button');tabSelect.className='tab-select';const tabClose=document.createElement('button');tabClose.textContent='×';tab.append(tabSelect,tabClose);
+const tab=document.createElement('div');tab.className='tab cluster-dev-tab';tab.dataset.tabKey='tool:development-environment';tab.style.display='none';const tabSelect=document.createElement('button');tabSelect.className='tab-select';const tabClose=document.createElement('button');tabClose.textContent='×';tab.append(tabSelect,tabClose);
 let active=false;
 function script(p,kind){const cmd=p[kind==='install'?3:kind==='uninstall'?4:5];const lines=['@echo off','setlocal','chcp 65001 >nul','echo Cluster: '+p[1]+' '+kind];if(kind==='uninstall')lines.push('choice /C YN /M "Remove '+p[1]+'?"','if errorlevel 2 exit /b 2');lines.push(cmd,'set "result=%errorlevel%"','echo Exit code: %result%','pause','exit /b %result%');return lines.join('\r\n')+'\r\n';}
 function download(p,kind){const blob=new Blob([script(p,kind)],{type:'application/octet-stream'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=p[0]+'-'+kind+'.cmd';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
@@ -74,14 +74,28 @@ function render(){const d=dict[lang()];tabSelect.textContent=d.dev;
  input.oninput=()=>{searchText=input.value;render()};
  if(previous){input.focus();input.setSelectionRange(caret,caret)}
 }
-function open(){active=true;tabs.append(tab);tab.style.display='flex';terminal.hidden=true;document.body.classList.remove('cluster-terminal-active');$('editorShell').hidden=true;$('empty').hidden=true;if($('localRangeView'))$('localRangeView').hidden=true;if($('clusterBottomBar'))$('clusterBottomBar').hidden=true;panel.hidden=false;document.querySelectorAll('#tabList .tab').forEach(t=>t.classList.remove('is-active'));tab.classList.add('is-active');render();}
-function close(){active=false;panel.hidden=true;tab.style.display='none';tab.remove();window.cluster?.fm?.notify?.();}
+let opened=false;
+function ensureTab(){if(!opened)return;if(!tabs.contains(tab))tabs.append(tab);tab.style.display='flex';window.ClusterTabOrder?.apply?.();}
+function deactivate(){if(!opened)return;active=false;panel.hidden=true;tab.classList.remove('is-active');}
+function open(){opened=true;active=true;ensureTab();window.ClusterTerminal?.deactivate?.();terminal.hidden=true;document.body.classList.remove('cluster-terminal-active');$('editorShell').hidden=true;$('empty').hidden=true;if($('localRangeView'))$('localRangeView').hidden=true;if($('clusterBottomBar'))$('clusterBottomBar').hidden=true;panel.hidden=false;document.querySelectorAll('#tabList .tab').forEach(t=>t.classList.remove('is-active'));tab.classList.add('is-active');render();}
+function close(){if(!opened)return;const wasActive=active;opened=false;active=false;panel.hidden=true;tab.remove();if(wasActive)window.cluster?.fm?.notify?.();}
 tabSelect.onclick=open;tabClose.onclick=close;
 const toolbar=terminal.querySelector('.terminal-toolbar'),revoke=$('terminalRevoke'),newSession=$('terminalNew'),closeSession=$('terminalClose');
 const menuWrap=document.createElement('span');menuWrap.style.cssText='position:relative;display:inline-flex';const trigger=document.createElement('button');trigger.id='terminalToolButton';trigger.type='button';const menu=document.createElement('div');menu.hidden=true;menu.style.cssText='position:absolute;right:0;top:100%;z-index:30;min-width:230px;padding:8px;background:#24252c;border:1px solid #555;border-radius:8px';revoke.remove();revoke.style.cssText+=';display:block;width:100%;margin-bottom:6px';const devButton=document.createElement('button');devButton.type='button';devButton.id='terminalDevButton';devButton.style.cssText='display:block;width:100%';menu.append(revoke,devButton);menuWrap.append(trigger,menu);toolbar.append(menuWrap);trigger.onclick=()=>{menu.hidden=!menu.hidden};devButton.onclick=()=>{menu.hidden=true;open()};document.addEventListener('click',e=>{if(!menuWrap.contains(e.target))menu.hidden=true});
 function localize(){const d=dict[lang()];newSession.textContent=d.new;closeSession.textContent=d.close;trigger.textContent=d.tool+' ▾';revoke.textContent=d.revoke;devButton.textContent=d.dev;const guide=$('terminalSetup');if(guide){const h=guide.querySelector('h3'),li=guide.querySelectorAll('ol li');if(h)h.textContent=d.guide;li.forEach((el,i)=>{if(i===0){const a=el.querySelector('a');if(a){a.textContent=lang()==='zh'?'下載 Cluster Agent 安裝程式 (.cmd)':'Download Cluster Agent installer (.cmd)';el.replaceChildren(document.createTextNode(lang()==='zh'?'安裝 Node.js 20+，並':'Install Node.js 20+ and '),a)}else el.textContent=d.steps[i]}else el.textContent=d.steps[i]});const a=guide.querySelector('p a[href="../TERMINAL_SETUP.md"]');if(a)a.textContent=d.help;}if(active)render();}
 $('uiLanguage')?.addEventListener('change',localize);localize();
-const observer=new MutationObserver(()=>{if(active&&!panel.hidden){panel.hidden=false;tab.classList.add('is-active')}});observer.observe(tabs,{childList:true});
+// Editor's tabs() rebuilds #tabList via replaceChildren. Keep this tab alive
+// across file changes without forcing the Development panel back on top.
+window.cluster?.fm?.onChange?.(()=>{if(opened)ensureTab();});
+tabs.addEventListener('click',event=>{
+ const clicked=event.target.closest('.tab');
+ if(!clicked||clicked===tab||!opened)return;
+ if(event.target.closest('.tab-select'))deactivate();
+},true);
+// Terminal sessions and file tabs are separate views; their selection should
+// not close or remove the Development Environment tab.
+const observer=new MutationObserver(()=>{if(opened&&!tabs.contains(tab))ensureTab();});
+observer.observe(tabs,{childList:true});
 document.querySelector('[data-action="closeall"]')?.addEventListener('click',close);
-window.ClusterDevelopmentEnvironment={open,close,download};
+window.ClusterDevelopmentEnvironment={open,close,deactivate,download};
 })();
