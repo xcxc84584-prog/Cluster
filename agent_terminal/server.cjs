@@ -32,12 +32,23 @@ const MAX_SESSIONS=8,MAX_MESSAGE=65536;
 const roots=new Map();const sessions=new Map();
 const gatewayStarted=Date.now();
 const gatewayTasks=new Map();
+const pendingTools=new Map();let browserBridge=null;
 function gatewayResponse(res,status,data){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));}
 const server=http.createServer((req,res)=>{
  const route=(req.url||'').split('?')[0];
- if(req.method!=='GET'||!['/mcp/status','/mcp/tasks'].includes(route)){gatewayResponse(res,404,{error:'Not Found'});return;}
  if(!isLoopback(req.socket.remoteAddress)||typeof req.headers.authorization!=='string'||req.headers.authorization.length!==7+token.length||!crypto.timingSafeEqual(Buffer.from(req.headers.authorization),Buffer.from('Bearer '+token))){gatewayResponse(res,403,{error:'Forbidden'});return;}
- if(route==='/mcp/status')gatewayResponse(res,200,{connected:true,service:'Cluster Local Gateway',version:'p3-readonly',uptimeMs:Date.now()-gatewayStarted,activeTerminalSessions:sessions.size,capabilities:['cluster.get_status','cluster.get_task_status'],browserEditorConnected:false});
+ if(req.method==='POST'&&route==='/mcp/call'){
+  let raw='';req.on('data',chunk=>{raw+=chunk;if(raw.length>8192)req.destroy();});
+  req.on('end',()=>{let m;try{m=JSON.parse(raw)}catch{gatewayResponse(res,400,{error:'Invalid JSON'});return;}
+   if(!['cluster.list_files','cluster.read_file','cluster.get_editor_state'].includes(m.name)){gatewayResponse(res,400,{error:'Unknown tool'});return;}
+   if(!browserBridge||browserBridge.readyState!==1){gatewayResponse(res,503,{error:'Cluster browser bridge disconnected'});return;}
+   const requestId=crypto.randomUUID();const timer=setTimeout(()=>{pendingTools.delete(requestId);gatewayResponse(res,504,{error:'Browser bridge timeout'});},10000);
+   pendingTools.set(requestId,{res,timer});
+   send(browserBridge,{type:'tool_call',requestId,name:m.name,args:m.arguments||{}});
+  });return;
+ }
+ if(req.method!=='GET'||!['/mcp/status','/mcp/tasks'].includes(route)){gatewayResponse(res,404,{error:'Not Found'});return;}
+ if(route==='/mcp/status')gatewayResponse(res,200,{connected:true,service:'Cluster Local Gateway',version:'p3.4-readonly',uptimeMs:Date.now()-gatewayStarted,activeTerminalSessions:sessions.size,capabilities:['cluster.get_status','cluster.get_task_status','cluster.list_files','cluster.read_file','cluster.get_editor_state'],browserEditorConnected:!!browserBridge&&browserBridge.readyState===1});
  else gatewayResponse(res,200,{tasks:[...gatewayTasks.values()].slice(-50)});
 });
 const wss=new WebSocketServer({noServer:true,maxPayload:MAX_MESSAGE});
@@ -65,6 +76,8 @@ wss.on('connection',ws=>{
    if(!authorized){if(m.type!=='auth'||typeof m.token!=='string'||m.token.length!==token.length||!crypto.timingSafeEqual(Buffer.from(m.token),Buffer.from(token)))throw Error('Authentication failed');authorized=true;clearTimeout(timeout);send(ws,{type:'ready',maxSessions:MAX_SESSIONS});return;}
    if(ws.clusterAgentMode){
     if(m.type==='ping'){send(ws,{type:'pong',requestId:m.requestId,at:Date.now()});return;}
+    if(m.type==='bridge_register'){browserBridge=ws;send(ws,{type:'bridge_registered'});return;}
+    if(m.type==='tool_result'){const pending=pendingTools.get(m.requestId);if(!pending||ws!==browserBridge)return;pendingTools.delete(m.requestId);clearTimeout(pending.timer);gatewayResponse(pending.res,m.error?422:200,m.error?{error:String(m.error).slice(0,300)}:{result:m.result});return;}
     if(m.type==='provider_get'){const p=readProvider();send(ws,{type:'provider_info',configured:!!p.apiKey,model:p.model});return;}
     if(m.type==='provider_set'){
      if(typeof m.apiKey!=='string'||!/^sk-[\w-]{10,256}$/.test(m.apiKey)||typeof m.model!=='string'||/^[\w.:-]{1,100}$/.test(m.model)===false)throw Error('Invalid API key or model');
@@ -138,7 +151,7 @@ wss.on('connection',ws=>{
    else throw Error('Unknown operation');
   }catch(e){send(ws,{type:'error',requestId:m?.requestId,message:e.message});}
  });
- ws.on('close',()=>{aiTask?.controller.abort();clearTimeout(timeout);for(const id of owned)closeSession(id);});
+ ws.on('close',()=>{if(browserBridge===ws){browserBridge=null;for(const [id,p] of pendingTools){clearTimeout(p.timer);gatewayResponse(p.res,503,{error:'Browser disconnected'});pendingTools.delete(id);}}aiTask?.controller.abort();clearTimeout(timeout);for(const id of owned)closeSession(id);});
 });
 server.on('error',e=>{if(e.code==='EADDRINUSE'){console.error('Port '+PORT+' already in use. Cluster Agent may already be running. Do not start a second copy.');process.exitCode=0;}else{console.error(e);process.exitCode=1;}});
 server.listen(PORT,'127.0.0.1',()=>{
