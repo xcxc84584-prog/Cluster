@@ -115,3 +115,7 @@ P3.7.1 的一鍵腳本已提交 GitHub，但尚未在使用者 Windows 環境執
 - Cluster-OAuth-Local-Test.ps1 修復 Node.js v24 無法檢查 `.download` 副檔名的問題，改為 `.download.cjs` 後再檢查語法。
 - **使用者已實測：** v20261108-syntaxfix-3 自動找到 cloudflared，成功建立 Quick Tunnel；OAuth 舊版測試因副檔名錯誤失敗。
 - **尚待使用者實測：** v20261108-url-output-4 是否正確顯示 MCP URL；修正版 OAuth 測試是否全部 PASS。
+
+## 10. OAuth 測試快取修復（P3.7.3）
+
+使用者在 Node.js v24.22.0 執行 OAuth 本機測試時，舊版 CMD 仍下載 `.download` 腳本，出現 ERR_UNKNOWN_FILE_EXTENSION。已修正 `Cluster-OAuth-Local-Test.ps1` 的下載、語法檢查、刪除與移動路徑全部使用 `.download.cjs`，並將 `Cluster-OAuth-OneClick.cmd` 固定至修正版 Commit，採用隨機 TEMP 腳本檔名避免快取混淆。重新下載 CMD 後第一行應顯示 `Cluster OAuth Local Setup - v20261108-cachefix-3`。此修正尚待 Windows 實測。
