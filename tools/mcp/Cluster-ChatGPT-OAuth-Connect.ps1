@@ -4,8 +4,15 @@ Write-Host 'This creates a temporary OAuth HTTPS endpoint for testing. Keep this
 $base=Join-Path $env:LOCALAPPDATA 'ClusterTerminalAgent'
 $gateway=Join-Path $base 'app\oauth-mcp-gateway.cjs'
 if(!(Test-Path -LiteralPath $gateway)){throw 'Run Cluster-OAuth-OneClick.cmd local test first.'}
+Write-Host 'Updating OAuth Gateway to CSP fix P3.8.1...' -ForegroundColor Cyan
+$gatewayDownload=$gateway+'.update.cjs'
+Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/0e9c21dc83bf261b2117fb02b04998b788685f0c/agent_terminal/oauth-mcp-gateway.cjs' -OutFile $gatewayDownload
+
 $node=(Get-Command node.exe -ErrorAction SilentlyContinue)
 if(!$node){throw 'Node.js 20+ is required.'}
+& $node.Source --check $gatewayDownload
+if($LASTEXITCODE -ne 0){throw 'Updated OAuth Gateway syntax check failed.'}
+Move-Item -LiteralPath $gatewayDownload -Destination $gateway -Force
 $cloud=$null
 foreach($candidate in @('C:\Program Files (x86)\cloudflared\cloudflared.exe','C:\Program Files\cloudflared\cloudflared.exe',"$env:LOCALAPPDATA\Microsoft\WinGet\Links\cloudflared.exe")){
  if(Test-Path -LiteralPath $candidate -PathType Leaf){$cloud=$candidate;break}
