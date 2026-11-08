@@ -31,7 +31,7 @@ if ($listener) {
   if (-not $released) { throw 'Port 43879 is still occupied. Installation aborted.' }
   Write-Host 'Port 43879 released. Continuing installation.' -ForegroundColor Green
 }
-$items=@('server.cjs','package.json','start-background.cmd','run-hidden.vbs','start-agent.cmd')
+$items=@('server.cjs','remote-mcp.cjs','mcp-stdio.cjs','start-remote-mcp.cmd','package.json','start-background.cmd','run-hidden.vbs','start-agent.cmd')
 foreach($item in $items){Copy-Item -LiteralPath (Join-Path $source $item) -Destination (Join-Path $target $item) -Force}
 $origin | Set-Content -LiteralPath (Join-Path $config 'origin.txt') -Encoding ascii
 Push-Location $target
