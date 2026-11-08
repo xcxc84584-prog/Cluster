@@ -189,6 +189,8 @@ const $=id=>document.getElementById(id);
 const emit=(plugin,message)=>{const event={time:new Date().toISOString(),plugin,message};try{const a=JSON.parse(localStorage.getItem('cluster005_logs')||'[]');a.push(event);localStorage.setItem('cluster005_logs',JSON.stringify(a.filter(x=>Date.parse(x.time)>Date.now()-7*86400000).slice(-1000)))}catch{}$('notice').textContent=message.slice(0,100)};
 const fm=new FileManager(emit);window.cluster={fm,emit};let start=1,count=160,token=0,shownDoc=null;
 const editor=$('editor'),gutter=$('gutter');
+// Read-only viewport coordinates for syntax highlighting; no document mutations.
+window.ClusterSyntaxViewport={start:()=>start,count:()=>count};
 let lastSmallText='',externalSyncBusy=false;
 const vTimers=new Map();async function persistV(d){try{if(!d.vKey)d.vKey=await ClusterVJournal.fingerprint(d.file);setDocStatus(d,'yellow','正在記錄 V 操作',35);await ClusterVJournal.write(d.vKey,{revision:d.vRevision,operations:d.vOperations,mutations:d.mutations});d.vError=null;setDocStatus(d,'yellow',`V 已持久化（${d.vOperations.length} 筆），原始文件未同步`,100)}catch(e){d.vError=e;setDocStatus(d,'red','V 記錄失敗：'+e.message,0)}}
 function queueV(d,op){d.vOperations.push({...op,id:++d.vRevision,at:Date.now()});setDocStatus(d,'yellow','V 尚未完成持久化',5);clearTimeout(vTimers.get(d.id));vTimers.set(d.id,setTimeout(()=>persistV(d),350))}
