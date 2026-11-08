@@ -81,3 +81,24 @@
 #syntaxEditorPage .syntax-ext-entry{border:1px solid #2b3544;border-radius:6px;background:#151b25;padding:11px 13px;color:#cdd8e9}
 #syntaxEditorPage .syntax-ext-entry:hover{background:#222c3c;border-color:#5271a6}
 @media(max-width:650px){.syntax-fields{grid-template-columns:1fr}.syntax-page-indicator{display:none}#syntaxEditorPage .syntax-tool-actions{flex-wrap:wrap}}
+
+/* Fix title banner: align background to content grid, not viewport width. */
+#syntaxEditorPage .syntax-page-header{
+ box-sizing:border-box;
+ width:100%;
+ max-width:920px;
+ margin:0;
+ padding:16px 22px;
+ min-height:82px;
+ background:#10141b;
+ border:1px solid #252c38;
+ border-radius:10px;
+ align-items:center;
+}
+#syntaxEditorPage .syntax-page-identity{min-width:0;align-items:center;gap:14px}
+#syntaxEditorPage .syntax-page-identity>div{min-width:0}
+#syntaxEditorPage .syntax-page-identity strong{line-height:1.4}
+#syntaxEditorPage .syntax-page-identity p{line-height:1.5;margin:4px 0 0}
+#syntaxEditorPage .syntax-page-icon{flex:0 0 44px;width:44px;height:44px}
+#syntaxEditorPage .syntax-page-indicator{flex-shrink:0}
+@media(max-width:650px){#syntaxEditorPage .syntax-page-header{padding:14px 16px}}
