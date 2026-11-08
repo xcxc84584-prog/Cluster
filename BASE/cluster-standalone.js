@@ -164,51 +164,63 @@ async function flushV(d){clearTimeout(vTimers.get(d.id));if(d.vOperations.length
 // V windows before the displayed original line. Never change source indexing.
 // Line-coordinate mapping for V windows. Only count changed content, not
 // the entire 160-line viewport. Overlapping edited ranges are unsafe to sum.
+// V coordinates: compute actual edits, never infer a delta from an
+// entire viewport. Keep one deterministic, Base-relative edit set.
 function vLineMap(doc){
  const latest=new Map();
- for(const op of doc?.vOperations||[]){
+ for(const op of doc?.vOperations||[])
   if(op.kind==='window'&&Number.isInteger(op.start)&&Number.isInteger(op.count)&&op.count>0&&typeof op.text==='string')
    latest.set(op.start+':'+op.count,op);
- }
- const windows=[...latest.values()].sort((a,b)=>a.start-b.start);
- const entries=[];let previousEnd=0,offset=0,conflict=false;
- for(const op of windows){
+ const edits=[];
+ for(const op of latest.values()){
   const originalCount=Math.min(op.count,Math.max(0,doc.lineStarts.length-op.start+1));
   if(!originalCount)continue;
-  const end=op.start+originalCount-1;
-  if(op.start<=previousEnd){conflict=true;continue}
-  // An untouched window must not contribute an artificial -1 or +1.
-  const newCount=op.text.split('\n').length;
-  const delta=newCount-originalCount;
-  entries.push({start:op.start,end,delta,before:offset,after:offset+delta,newCount});
-  offset+=delta;previousEnd=end;
+  // A synchronous map uses recorded Base snapshots where available.
+  // Until a snapshot exists, do not invent a window-sized offset.
+  if(!Array.isArray(op.baseLines))continue;
+  const base=op.baseLines,updated=op.text.split('\n').map(x=>x.replace(/\r$/,''));
+  let pre=0,suf=0;
+  while(pre<base.length&&pre<updated.length&&base[pre]===updated[pre])pre++;
+  while(suf<base.length-pre&&suf<updated.length-pre&&base[base.length-1-suf]===updated[updated.length-1-suf])suf++;
+  const removed=base.length-pre-suf,added=updated.slice(pre,updated.length-suf);
+  if(removed||added.length)edits.push({line:op.start+pre,removed,added,order:op.id||0});
  }
- return {entries,conflict,total:doc.lineStarts.length+offset};
+ edits.sort((a,b)=>b.order-a.order);
+ const selected=[];
+ for(const e of edits){
+  if(selected.some(p=>e.line<p.line+p.removed&&p.line<e.line+e.removed))continue;
+  selected.push(e);
+ }
+ selected.sort((a,b)=>a.line-b.line);
+ let delta=0;
+ const entries=selected.map(e=>{const before=delta;delta+=e.added.length-e.removed;return {...e,before,after:delta}});
+ return {entries,total:doc.lineStarts.length+delta,conflict:false};
 }
 function vDisplayLine(map,baseLine){
  let delta=0;
- for(const e of map.entries){if(baseLine>e.end)delta=e.after;else break}
+ for(const e of map.entries){if(baseLine>=e.line+e.removed)delta=e.after;else break}
  return baseLine+delta;
 }
 function vBaseLine(map,displayLine){
  let delta=0;
  for(const e of map.entries){
-  const begin=e.start+e.before,finish=begin+e.newCount-1;
+  const begin=e.line+e.before,finish=begin+e.added.length;
   if(displayLine<begin)break;
-  if(displayLine<=finish)return Math.max(e.start,Math.min(e.end,e.start+displayLine-begin));
+  if(displayLine<finish)return Math.max(1,e.line);
   delta=e.after;
  }
- return displayLine-delta;
+ return Math.max(1,displayLine-delta);
 }
 // [FIX-001] Gutter uses one non-wrapping DOM row per physical line.
 // The old CSS sets #gutter{white-space:normal}; textContent with newline characters
 // collapses into spaces and wraps as '1 2 3' instead of one number per row.
 function renderGutter(first,total){
   const fragment=document.createDocumentFragment();
+  const map=vLineMap(fm.active);
   for(let i=0;i<Math.min(total,5000);i++){
     const row=document.createElement('span');
     row.className='line-number';
-    row.textContent=String(vDisplayLine(vLineMap(fm.active),first+i));
+    row.textContent=String(vDisplayLine(map,first+i));
     if(fm.active && [...fm.active.blocks.values()].some(b=>first+i>=b.start&&first+i<=b.end))row.classList.add('cluster-block');
     fragment.appendChild(row);
   }
@@ -241,7 +253,7 @@ fm.onChange(()=>{tabs();if(document.activeElement!==editor||shownDoc!==fm.active
 })();
 
 function setLoad(msg){$('clusterLoad').hidden=false;$('loadLabel').textContent=msg;$('loadPercent').textContent='';$('loadDetail').textContent=''}
-async function render(){const d=fm.active,t=++token;if(!d)return;shownDoc=d;editor.disabled=!d.indexComplete&&d.size>=100000;try{if(d.size<100000){editor.value=d.vOperations.length?([ ...d.vOperations ].reverse().find(x=>x.kind==='small')?.text??await d.getAllSmall()):d.mutations.length?d.mutations.at(-1).text:await d.getAllSmall();if(t!==token)return;start=1;const n=editor.value.split('\n').length;lastSmallText=editor.value;renderGutter(1,n);$('clusterLoad').hidden=true;return}if(!d.indexComplete){editor.disabled=true;editor.value='正在建立行號索引…';gutter.textContent='';setLoad('Indexing');if(!d.indexPromise)d.indexPromise=d.index(p=>{if(fm.active===d){$('loadLabel').textContent='Indexing';$('loadPercent').textContent=(p*100).toFixed(1)+'%'}}).then(()=>{if(fm.active===d)void render()}).catch(e=>emit('SegmentLoader','ERROR PR6:001 '+e.message)).finally(()=>{d.indexPromise=null});return}const lines=await d.getLines(start,count);if(t!==token)return;editor.value=d.pendingView&&d.pendingView.start===start?d.pendingView.text:lines.join('\n');renderGutter(start,editor.value.split('\n').length);setLoad(`Visible ${start}–${start+lines.length-1}`)}catch(e){emit('SegmentLoader','ERROR PR6:001 '+e.message)}}
+async function render(){const d=fm.active,t=++token;if(!d)return;shownDoc=d;editor.disabled=!d.indexComplete&&d.size>=100000;try{if(d.size<100000){editor.value=d.vOperations.length?([ ...d.vOperations ].reverse().find(x=>x.kind==='small')?.text??await d.getAllSmall()):d.mutations.length?d.mutations.at(-1).text:await d.getAllSmall();if(t!==token)return;start=1;const n=editor.value.split('\n').length;lastSmallText=editor.value;renderGutter(1,n);$('clusterLoad').hidden=true;return}if(!d.indexComplete){editor.disabled=true;editor.value='正在建立行號索引…';gutter.textContent='';setLoad('Indexing');if(!d.indexPromise)d.indexPromise=d.index(p=>{if(fm.active===d){$('loadLabel').textContent='Indexing';$('loadPercent').textContent=(p*100).toFixed(1)+'%'}}).then(()=>{if(fm.active===d)void render()}).catch(e=>emit('SegmentLoader','ERROR PR6:001 '+e.message)).finally(()=>{d.indexPromise=null});return}const lines=await d.getLines(start,count);if(t!==token)return;d.currentBaseLines=await d.getBaseWindowLines(start,count);if(t!==token)return;editor.value=d.pendingView&&d.pendingView.start===start?d.pendingView.text:lines.join('\n');renderGutter(start,editor.value.split('\n').length);setLoad(`Visible ${start}–${start+lines.length-1}`)}catch(e){emit('SegmentLoader','ERROR PR6:001 '+e.message)}}
 const action={new:()=>fm.create(),open:async()=>{try{if(window.showOpenFilePicker && window.isSecureContext){try{const handles=await window.showOpenFilePicker({multiple:true});for(const handle of handles){const file=await handle.getFile();await fm.open(file,handle);emit('FileManager',`External watch active: ${file.name}`)}await pollExternal();return}catch(err){if(err.name==='AbortError')return;emit('FileManager',`Native picker fallback: ${err.message}`)}}const picker=$('fileInput');if(!picker)throw Error('fileInput missing');picker.value='';picker.click();emit('FileManager','Open file picker requested')}catch(e){emit('FileManager','ERROR OPEN: '+e.message)}},save:()=>save(false),saveas:()=>save(true),saveall:async()=>{for(const d of fm.docs)await save(false,d)},closeall:()=>{if(fm.docs.some(d=>d.dirty)&&!confirm('有未儲存文件，確定全部關閉？'))return;for(const d of [...fm.docs])fm.close(d.id);window.ClusterTerminal?.closeAll?.()}};
 async function save(as=false,doc=fm.active){if(!doc)return;try{if(doc.pendingView&&doc.size<100000){await doc.replaceLines(doc.pendingView.start,doc.pendingView.end,doc.pendingView.text);doc.pendingView=null}await flushV(doc);editor.disabled=true;try{await fm.save(doc,as)}catch(e){if(String(e.message).startsWith('V_ACTUAL_CONFLICT:')){const ok=confirm('偵測到實際 V 編輯範圍衝突。強制合併會依最新編輯覆蓋衝突區域，可能遺失較早的衝突修改。V 紀錄在儲存成功前仍會保留。是否強制合併？');if(ok)await fm.save(doc,as,true);else emit('FileManager','已取消強制合併；V 紀錄保留')}else throw e}finally{editor.disabled=false}tabs()}catch(e){emit('FileManager','ERROR '+e.message)}}
 $('fileButton').onclick=()=>{if(!$('fileMenu').hidden){/* closing */}else{$('blockDirectory').hidden=true;$('blockDirectoryButton').setAttribute('aria-expanded','false')} $('fileMenu').hidden=!$('fileMenu').hidden;$('fileButton').setAttribute('aria-expanded',String(!$('fileMenu').hidden))};$('fileMenu').addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;$('fileMenu').hidden=true;action[b.dataset.action]?.()});document.addEventListener('pointerdown',e=>{if(!e.target.closest('.menu-wrap'))$('fileMenu').hidden=true});
@@ -260,7 +272,7 @@ $('clusterGoLine').onclick=async()=>{const d=fm.active;if(!d)return;const n=Numb
  }catch(e){emit('SegmentLoader','ERROR PR8:001 '+e.message)}
 };
 $('clusterLocalEdit').onclick=()=>{const d=fm.active;if(!d)return;const n=Number($('clusterLine').value)||1;void flushV(d).then(()=>{start=Math.max(1,n);return render()})};
-editor.addEventListener('input',()=>{const d=fm.active;if(!d)return;d.dirty=true;if(d.size<100000){d.syncSmallBlocks(lastSmallText,editor.value);lastSmallText=editor.value;d.mutations=[{start:0,end:d.size,text:editor.value}];d.version++;queueV(d,{kind:'small',text:editor.value});refreshSmallGutter();updateBlockDirectory()}else{d.pendingView={start,end:Math.min(d.lineStarts.length,start+count-1),text:editor.value};queueV(d,{kind:'window',start,count,text:editor.value})};tabs()});
+editor.addEventListener('input',()=>{const d=fm.active;if(!d)return;d.dirty=true;if(d.size<100000){d.syncSmallBlocks(lastSmallText,editor.value);lastSmallText=editor.value;d.mutations=[{start:0,end:d.size,text:editor.value}];d.version++;queueV(d,{kind:'small',text:editor.value});refreshSmallGutter();updateBlockDirectory()}else{d.pendingView={start,end:Math.min(d.lineStarts.length,start+count-1),text:editor.value};queueV(d,{kind:'window',start,count,text:editor.value,baseLines:d.currentBaseLines||null})};tabs()});
 // [OPT2] Virtual page scrolling: shift logical windows when reaching either edge.
 let pageShiftBusy=false;
 async function shiftWindow(direction){
