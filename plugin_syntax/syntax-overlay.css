@@ -40,3 +40,16 @@
 .syntax-ext-entries{max-height:180px;overflow:auto;display:flex;flex-direction:column;gap:2px}
 .syntax-ext-entry{width:100%;text-align:left;background:#181c24;color:#e4e9f1;border:0;border-radius:3px;padding:4px 7px;cursor:pointer;font-family:monospace;font-size:12px}
 .syntax-ext-entry:hover{background:#303b4f}
+
+/* Standalone editor page for extension rules. */
+#syntaxEditorPage.syntax-editor-page{flex:1;min-width:0;min-height:0;overflow:auto;background:#0b0e13;color:#e8edf5;padding:24px 32px;box-sizing:border-box}
+#syntaxEditorPage[hidden]{display:none!important}
+.syntax-page-header{display:flex;align-items:center;gap:20px;padding-bottom:20px;border-bottom:1px solid #343b47;font-size:18px}
+.syntax-page-header span{font-size:13px;color:#9aa9bb}
+.syntax-page-body{display:flex;flex-direction:column;gap:12px;max-width:600px;padding-top:25px}
+.syntax-page-body label{font-size:13px;color:#bac5d4}
+.syntax-page-body input,.syntax-page-body select{box-sizing:border-box;width:100%;padding:10px;background:#171c25;color:#f5f6fa;border:1px solid #495467;border-radius:5px}
+.syntax-page-body .syntax-tool-actions{gap:10px}
+.syntax-page-body .syntax-tool-actions button{padding:10px 12px;font-size:13px}
+.syntax-page-body .syntax-ext-entries{max-height:50vh;overflow:auto;gap:4px}
+.syntax-page-body .syntax-ext-entry{font-size:13px;padding:9px 12px}
