@@ -149,3 +149,17 @@ P3.7.1 的一鍵腳本已提交 GitHub，但尚未在使用者 Windows 環境執
 - 目前僅五個唯讀工具，不包含 PowerShell 執行與檔案寫入。
 - 一鍵腳本會從本專案 GitHub 下載並執行程式，使用前請確認來源可信。
 - OAuth 外部完整授權、工具呼叫及安全測試尚待實測。
+
+## 12. P3.8.1 OAuth 授權表單 CSP 修正
+
+使用者 DevTools 顯示 `Sending form data to .../approve violates Content Security Policy directive: form-action 'self'`，因此按下同意時請求被瀏覽器阻擋。已將授權表單 action 指向明確 HTTPS issuer `/approve`，CSP form-action 只允許該 issuer。新版 `Cluster-ChatGPT-OAuth-Connect.cmd` 標題為 `P3.8.1-CSP`，啟動時會下載經 Node 語法檢查的 Gateway 修正版。
+
+### 更新操作
+
+1. 先關閉**舊版 ChatGPT OAuth Connect** 視窗，確認 43881 已釋放；保留本地 MCP（43880）運作。
+2. 重新下載並執行 `tools/mcp/Cluster-ChatGPT-OAuth-Connect.cmd`，確認顯示 `P3.8.1-CSP`。
+3. 使用**新輸出的 OAuth MCP URL** 更新或重建 ChatGPT 連接器；舊 Quick Tunnel URL 不能繼續使用。
+4. 開啟新的 OAuth 同意頁，密碼只在該頁輸入，按一次「同意授權」。
+5. 若仍失敗，開 Chrome DevTools Console，回報不含授權碼、state、token、密碼的錯誤。
+
+此修正已提交但尚未通過使用者 Windows 實測。
