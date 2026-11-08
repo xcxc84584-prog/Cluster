@@ -106,7 +106,7 @@ observer.observe(tabs,{childList:true});
 document.querySelector('[data-action="closeall"]')?.addEventListener('click',close);
 const toolsButton=$('developmentOpenPage');
 if(toolsButton){
- const updateToolLabel=()=>{toolsButton.textContent=lang()==='zh'?'開發環境':'Development Environment'};
+ const updateToolLabel=()=>{(toolsButton.querySelector('.cluster-tool-text')||toolsButton).textContent=lang()==='zh'?'開發環境':'Development Environment'};
  toolsButton.addEventListener('click',()=>{
   document.getElementById('fileMenu')?.removeAttribute('open');
   window.ClusterSyntaxPage?.deactivate?.();
