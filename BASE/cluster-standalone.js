@@ -215,6 +215,7 @@ const fm=new FileManager(emit);window.cluster={fm,emit};let start=1,count=160,to
 const editor=$('editor'),gutter=$('gutter');
 // Read-only viewport coordinates for syntax highlighting; no document mutations.
 window.ClusterSyntaxViewport={start:()=>start,count:()=>count};
+window.ClusterWorkspaceViewport={get:()=>start,set:(doc,line)=>{if(!doc||!Number.isSafeInteger(line)||line<1)return;doc._viewportStart=line;if(fm.active===doc){start=line;void render()}}};
 window.ClusterEncoding={
  default:()=>defaultEncoding(),
  setDefault(label){
@@ -313,8 +314,8 @@ function refreshSmallGutter(){
   if(gutter.childElementCount!==Math.min(lines,5000))renderGutter(1,lines);
 }
 
-function tabs(){const list=$('tabList');const terminalVisible=!document.getElementById('clusterTerminalPanel')?.hidden;list.replaceChildren();for(const d of fm.docs){const el=document.createElement('div');el.className='tab'+(d===fm.active?' is-active':'');const select=document.createElement('button');select.className='tab-select';select.textContent=d.name+(d.dirty?' ●':'');select.onclick=()=>{window.ClusterSyntaxPage?.deactivate?.();window.ClusterTerminal?.deactivate?.();start=1;fm.select(d.id)};const close=document.createElement('button');close.className='tab-close';close.textContent='×';close.title='關閉文件';close.onclick=()=>{if(d.dirty&&!confirm('文件尚未儲存，確定關閉？'))return;fm.close(d.id)};el.dataset.tabKey='file:'+d.id;el.append(select,close);list.append(el)}$('empty').hidden=terminalVisible||!!fm.active;$('editorShell').hidden=terminalVisible||!fm.active;$('clusterBottomBar').hidden=terminalVisible||!fm.active;$('footerName').textContent=fm.active?.name||'未命名.txt';$('tierStatus').textContent=fm.active?(fm.active.size<100000?'L0':'L1'):'L0';updateBlockDirectory();window.ClusterSyntaxPage?.sync?.();window.ClusterTerminal?.syncTabs?.();window.ClusterTabOrder?.apply?.()}
-fm.onChange(()=>{tabs();if(document.activeElement!==editor||shownDoc!==fm.active)render()});
+function tabs(){const list=$('tabList');const terminalVisible=!document.getElementById('clusterTerminalPanel')?.hidden;list.replaceChildren();for(const d of fm.docs){const el=document.createElement('div');el.className='tab'+(d===fm.active?' is-active':'');const select=document.createElement('button');select.className='tab-select';select.textContent=d.name+(d.dirty?' ●':'');select.onclick=()=>{window.ClusterSyntaxPage?.deactivate?.();window.ClusterTerminal?.deactivate?.();if(fm.active)fm.active._viewportStart=start;start=Math.max(1,d._viewportStart||1);fm.select(d.id)};const close=document.createElement('button');close.className='tab-close';close.textContent='×';close.title='關閉文件';close.onclick=()=>{if(d.dirty&&!confirm('文件尚未儲存，確定關閉？'))return;fm.close(d.id)};el.dataset.tabKey='file:'+d.id;el.append(select,close);list.append(el)}$('empty').hidden=terminalVisible||!!fm.active;$('editorShell').hidden=terminalVisible||!fm.active;$('clusterBottomBar').hidden=terminalVisible||!fm.active;$('footerName').textContent=fm.active?.name||'未命名.txt';$('tierStatus').textContent=fm.active?(fm.active.size<100000?'L0':'L1'):'L0';updateBlockDirectory();window.ClusterSyntaxPage?.sync?.();window.ClusterTerminal?.syncTabs?.();window.ClusterTabOrder?.apply?.()}
+fm.onChange(()=>{tabs();if(document.activeElement!==editor||shownDoc!==fm.active){start=Math.max(1,fm.active?._viewportStart||1);render()}});
 
 /* Long-press tab reordering. Works across file and PowerShell tabs. */
 (()=>{
