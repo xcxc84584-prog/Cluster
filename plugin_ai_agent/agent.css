@@ -8,3 +8,6 @@ body.cluster-ai-active #clusterAiPanel:not([hidden]){display:flex!important}
 }
 .app > header #cexpToggle:hover,.app > header #clusterAiOpen:hover,.app > header button.cexp-open-terminal:hover,.app > header #terminalOpen:hover,.app > header #terminalButton:hover{background:#2a2b30!important;border-color:#777!important}
 @media(max-width:550px){.app > header #cexpToggle,.app > header #clusterAiOpen,.app > header button.cexp-open-terminal{min-width:auto!important;padding:0 8px!important;font-size:11px!important}}
+
+/* AI surface is visible only while selected; keep the tab when switching. */
+body:not(.cluster-ai-active) #clusterAiPanel{display:none!important}
