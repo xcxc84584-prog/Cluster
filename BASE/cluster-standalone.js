@@ -211,7 +211,7 @@ const lineHeight=()=>{const st=getComputedStyle(editor);return parseFloat(st.lin
 const centerLine=(localLine)=>{const h=lineHeight(),visible=Math.max(1,Math.floor(editor.clientHeight/h));editor.scrollTop=Math.max(0,(localLine-1-(visible-1)/2)*h);gutter.scrollTop=editor.scrollTop};
 $('clusterGoLine').onclick=async()=>{const d=fm.active;if(!d)return;const n=Number($('clusterLine').value);if(!Number.isInteger(n)||n<1){emit('SegmentLoader','ERROR PR8:001 Invalid line');return}
  try{if(d.size<100000){const lines=editor.value.split('\n');if(n>lines.length)throw Error('Line out of range');const pos=lines.slice(0,n-1).join('\n').length+(n>1?1:0);editor.focus();editor.setSelectionRange(pos,pos);centerLine(n);return}
- const map=vLineMap(d);if(!d.indexComplete||n>map.total)throw Error('Index unavailable or out of range');if(map.conflict)throw Error('V 編輯視窗重疊，無法安全定位；請先處理重疊 V 紀錄');const baseN=vBaseLine(map,n);
+ const map=vLineMap(d);if(!d.indexComplete||n>map.total)throw Error('Index unavailable or out of range');if(map.conflict)emit('SegmentLoader','V 視窗重疊：Go to line 暫以非重疊區間偏移定位');const baseN=vBaseLine(map,n);
  const visible=Math.max(5,Math.ceil(editor.clientHeight/lineHeight()));const before=Math.max(visible,Math.floor(count/3));await flushV(d);start=Math.max(1,baseN-before);await render();
  const local=baseN-start+1;const lines=editor.value.split('\n');const pos=lines.slice(0,local-1).join('\n').length+(local>1?1:0);editor.focus();editor.setSelectionRange(pos,pos);centerLine(local);
  // Preload adjacent byte slices in background without changing the viewport.
