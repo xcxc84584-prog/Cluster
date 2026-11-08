@@ -3,6 +3,11 @@
 /* Cluster v0.0.5 SegmentLoader: lazy 256000-byte slices; sparse line checkpoints; edit transactions */
 const SLICE_BYTES=250*1024;
 const decoder=new TextDecoder('utf-8');
+const ENCODING_PREFERENCE='cluster.encoding.default.v1';
+function defaultEncoding(){
+ try{return localStorage.getItem(ENCODING_PREFERENCE)||'big5'}catch{return 'big5'}
+}
+
 const encoder=new TextEncoder();
 const legacyEncodings=['utf-8','gb18030','big5'];
 function detectEncoding(bytes){
@@ -31,7 +36,7 @@ function setDocStatus(doc,kind,detail,progress){
 function showActiveStatus(doc){const x=doc?.saveState||{kind:'green',detail:'未選取文件',progress:100};ClusterVJournal.status(x.kind,x.detail,x.progress)}
 class SegmentDocument {
  constructor(file,emit=()=>{}){this.file=file;this.emit=emit;this.id=crypto.randomUUID();this.name=file.name;this.size=file.size;this.version=0;this.nodes=[];this.changes=[];this.blocks=new Map();this.blockAnchors=new Map();this.nextBlock=1;this.lineStarts=[0];this.indexedBytes=0;this.indexedLines=1;this.indexComplete=false;this.cache=new Map();this.cacheLimit=12;this.indexing=false;this.mutations=[];this.vOperations=[];this.vRevision=0;this.vKey=null;this.vError=null;this.saveState={kind:"green",detail:"已同步",progress:100};this.indexPromise=null;this.saveBusy=false;this.encoding='utf-8';this.encodingWarning=false;}  
- async init(){this.encoding=detectEncoding(new Uint8Array(await this.file.slice(0,65536).arrayBuffer()));this.encodingWarning=this.encoding!=='utf-8';if(this.encodingWarning)this.emit('SegmentLoader',this.name+': 偵測到 '+this.encoding+'，請確認文字編碼；儲存已保護');const n=Math.max(1,Math.ceil(this.size/SLICE_BYTES));for(let i=0;i<n;i++){const start=i*SLICE_BYTES,end=Math.min(this.size,start+SLICE_BYTES);this.nodes.push({id:i,start,end,prev:i?i-1:null,next:i+1<n?i+1:null});if(i===n-1||i%128===0)this.emit('SegmentLoader',`Load "${this.name}",Slice:${Math.ceil(end/1024)}/${Math.ceil(this.size/1024)}KB`)}this.emit('SegmentLoader','Sliced loading successfully established.');return this}
+ async init(){this.encoding=defaultEncoding();this.encodingWarning=this.encoding!=='utf-8';if(this.encodingWarning)this.emit('SegmentLoader',this.name+': 偵測到 '+this.encoding+'，請確認文字編碼；儲存已保護');const n=Math.max(1,Math.ceil(this.size/SLICE_BYTES));for(let i=0;i<n;i++){const start=i*SLICE_BYTES,end=Math.min(this.size,start+SLICE_BYTES);this.nodes.push({id:i,start,end,prev:i?i-1:null,next:i+1<n?i+1:null});if(i===n-1||i%128===0)this.emit('SegmentLoader',`Load "${this.name}",Slice:${Math.ceil(end/1024)}/${Math.ceil(this.size/1024)}KB`)}this.emit('SegmentLoader','Sliced loading successfully established.');return this}
  async getSlice(i){if(i<0||i>=this.nodes.length)return '';if(this.cache.has(i))return this.cache.get(i);const node=this.nodes[i];const text=new TextDecoder(this.encoding).decode(await this.file.slice(node.start,node.end).arrayBuffer());this.cache.set(i,text);if(this.cache.size>this.cacheLimit)this.cache.delete(this.cache.keys().next().value);return text}
  async textRange(start,end){start=Math.max(0,start);end=Math.min(this.size,end);if(end<=start)return '';return new TextDecoder(this.encoding).decode(await this.file.slice(start,end).arrayBuffer())}
  async index(onProgress=()=>{}){if(this.indexing)return;this.indexing=true;let offset=0,carryCR=false;const block=1024*1024;try{while(offset<this.size){const end=Math.min(this.size,offset+block);const bytes=new Uint8Array(await this.file.slice(offset,end).arrayBuffer());for(let i=0;i<bytes.length;i++){if(bytes[i]===10)this.lineStarts.push(offset+i+1)}offset=end;this.indexedBytes=offset;this.indexedLines=this.lineStarts.length;onProgress(offset/Math.max(1,this.size));if(offset%(8*block)===0)await new Promise(r=>setTimeout(r,0))}this.indexComplete=true;this.emit('SegmentLoader',`Index complete,lines:${this.lineStarts.length}`)}catch(e){this.emit('SegmentLoader',`ERROR PR6:001 ${e.message}`);throw e}finally{this.indexing=false}}
@@ -211,6 +216,13 @@ const editor=$('editor'),gutter=$('gutter');
 // Read-only viewport coordinates for syntax highlighting; no document mutations.
 window.ClusterSyntaxViewport={start:()=>start,count:()=>count};
 window.ClusterEncoding={
+ default:()=>defaultEncoding(),
+ setDefault(label){
+  if(!['utf-8','big5','gb18030'].includes(label))throw Error('Unsupported encoding');
+  localStorage.setItem(ENCODING_PREFERENCE,label);
+  return label;
+ },
+
  get:()=>({name:fm.active?.name||'',encoding:fm.active?.encoding||'utf-8'}),
  async set(label){
   const d=fm.active;if(!d)throw Error('No active file');
@@ -301,7 +313,7 @@ function refreshSmallGutter(){
   if(gutter.childElementCount!==Math.min(lines,5000))renderGutter(1,lines);
 }
 
-function tabs(){const list=$('tabList');const terminalVisible=!document.getElementById('clusterTerminalPanel')?.hidden;list.replaceChildren();for(const d of fm.docs){const el=document.createElement('div');el.className='tab'+(d===fm.active?' is-active':'');const select=document.createElement('button');select.className='tab-select';select.textContent=d.name+(d.dirty?' ●':'');select.onclick=()=>{window.ClusterTerminal?.deactivate?.();start=1;fm.select(d.id)};const close=document.createElement('button');close.className='tab-close';close.textContent='×';close.title='關閉文件';close.onclick=()=>{if(d.dirty&&!confirm('文件尚未儲存，確定關閉？'))return;fm.close(d.id)};el.dataset.tabKey='file:'+d.id;el.append(select,close);list.append(el)}$('empty').hidden=terminalVisible||!!fm.active;$('editorShell').hidden=terminalVisible||!fm.active;$('clusterBottomBar').hidden=terminalVisible||!fm.active;$('footerName').textContent=fm.active?.name||'未命名.txt';$('tierStatus').textContent=fm.active?(fm.active.size<100000?'L0':'L1'):'L0';updateBlockDirectory();window.ClusterTerminal?.syncTabs?.();window.ClusterTabOrder?.apply?.()}
+function tabs(){const list=$('tabList');const terminalVisible=!document.getElementById('clusterTerminalPanel')?.hidden;list.replaceChildren();for(const d of fm.docs){const el=document.createElement('div');el.className='tab'+(d===fm.active?' is-active':'');const select=document.createElement('button');select.className='tab-select';select.textContent=d.name+(d.dirty?' ●':'');select.onclick=()=>{window.ClusterSyntaxPage?.deactivate?.();window.ClusterTerminal?.deactivate?.();start=1;fm.select(d.id)};const close=document.createElement('button');close.className='tab-close';close.textContent='×';close.title='關閉文件';close.onclick=()=>{if(d.dirty&&!confirm('文件尚未儲存，確定關閉？'))return;fm.close(d.id)};el.dataset.tabKey='file:'+d.id;el.append(select,close);list.append(el)}$('empty').hidden=terminalVisible||!!fm.active;$('editorShell').hidden=terminalVisible||!fm.active;$('clusterBottomBar').hidden=terminalVisible||!fm.active;$('footerName').textContent=fm.active?.name||'未命名.txt';$('tierStatus').textContent=fm.active?(fm.active.size<100000?'L0':'L1'):'L0';updateBlockDirectory();window.ClusterSyntaxPage?.sync?.();window.ClusterTerminal?.syncTabs?.();window.ClusterTabOrder?.apply?.()}
 fm.onChange(()=>{tabs();if(document.activeElement!==editor||shownDoc!==fm.active)render()});
 
 /* Long-press tab reordering. Works across file and PowerShell tabs. */
