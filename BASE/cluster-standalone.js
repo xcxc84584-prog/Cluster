@@ -29,27 +29,49 @@ function detectEncoding(bytes){
 }
 
 // P3.9: convert immutable legacy source with byte-aligned edits.
-async function convertLegacyDocument(doc,force=false){
- const parts=[],chunkSize=256*1024,edits=[...doc.mutations].sort((a,b)=>a.start-b.start);
- let cursor=0,replacements=0;
- async function appendBase(from,to){
-  if(to<=from)return;
-  const decoder=new TextDecoder(doc.encoding,{fatal:!force});
-  for(let offset=from;offset<to;offset+=chunkSize){
-   const end=Math.min(to,offset+chunkSize);
-   const decoded=decoder.decode(await doc.file.slice(offset,end).arrayBuffer(),{stream:end<to});
-   replacements+=(decoded.match(/\uFFFD/g)||[]).length;
-   parts.push(encoder.encode(decoded));
-   if(offset%(chunkSize*32)===0)await new Promise(resolve=>setTimeout(resolve,0));
+// P3.9.1: preserve original legacy encoding on save.
+// Build reversible Big5 / GB18030 single- and double-byte mapping using browser decoders.
+// GB18030 four-byte characters require a dedicated codec; reject instead of corrupting.
+const legacyEncodeMaps=new Map();
+async function legacyEncodeMap(label){
+ if(legacyEncodeMaps.has(label))return legacyEncodeMaps.get(label);
+ const map=new Map();
+ for(let n=0;n<128;n++)map.set(String.fromCharCode(n),new Uint8Array([n]));
+ const dec=new TextDecoder(label,{fatal:true});
+ let iteration=0;
+ for(let lead=0x81;lead<=0xfe;lead++){
+  for(let trail=0x40;trail<=0xfe;trail++){
+   if(trail===0x7f)continue;
+   try{
+    const decoded=dec.decode(new Uint8Array([lead,trail]));
+    if([...decoded].length===1&&!map.has(decoded))map.set(decoded,new Uint8Array([lead,trail]));
+   }catch{}
   }
-  const tail=decoder.decode();if(tail)parts.push(encoder.encode(tail));
+  if(++iteration%8===0)await new Promise(resolve=>setTimeout(resolve,0));
  }
+ legacyEncodeMaps.set(label,map);return map;
+}
+async function encodeLegacyText(text,label,force){
+ const map=await legacyEncodeMap(label),out=[];let lossy=0;
+ for(const char of text){
+  const bytes=map.get(char);
+  if(bytes)out.push(bytes);
+  else if(force){out.push(new Uint8Array([63]));lossy++}
+  else throw Error('ENCODING_UNREPRESENTABLE:'+JSON.stringify(char)+' 無法編碼為 '+label);
+ }
+ return {blob:new Blob(out),lossy};
+}
+async function convertLegacyDocument(doc,force=false){
+ const parts=[],edits=[...doc.mutations].sort((a,b)=>a.start-b.start);
+ let cursor=0,lossy=0;
  for(const edit of edits){
   if(edit.start<cursor||edit.end<edit.start||edit.end>doc.size)throw Error('編輯區間重疊或無效');
-  await appendBase(cursor,edit.start);parts.push(encoder.encode(edit.text));cursor=edit.end;
+  parts.push(doc.file.slice(cursor,edit.start));
+  const result=await encodeLegacyText(edit.text,doc.encoding,force);
+  parts.push(result.blob);lossy+=result.lossy;cursor=edit.end;
  }
- await appendBase(cursor,doc.size);
- return {blob:new Blob(parts,{type:'text/plain;charset=utf-8'}),replacements};
+ parts.push(doc.file.slice(cursor));
+ return {blob:new Blob(parts,{type:'application/octet-stream'}),lossy};
 }
 function setDocStatus(doc,kind,detail,progress){
  if(!doc)return;
@@ -191,7 +213,7 @@ try{doc.vKey=await ClusterVJournal.fingerprint(file);const record=await ClusterV
     return {start:from,end:to,text:edit.added.join('\n')+(terminated?'\n':'')};
   });
   doc.mutations=patches;
- }const revision=doc.vRevision;setDocStatus(doc,'yellow','V 與原始文件整合：準備快照',5);let blob,handle=doc.handle;if(doc.encodingWarning){try{const converted=await convertLegacyDocument(doc,forceEncoding);blob=converted.blob;if(converted.replacements)this.emit('EncodingConverter','替代字元數：'+converted.replacements)}catch(e){throw Error('ENCODING_CONVERSION_FAILED:'+e.message)}saveAs=true;handle=null;setDocStatus(doc,'yellow','已轉換 UTF-8；請另存副本保留原檔',8)}else blob=await doc.exportBlob();try{if(saveAs||!handle?.createWritable){if(!window.showSaveFilePicker)throw Error('瀏覽器不支援直接存檔，請使用支援 File System Access API 的瀏覽器');handle=await showSaveFilePicker({suggestedName:doc.encodingWarning?doc.name.replace(/(\.[^.]+)?$/,'.utf8$1'):doc.name})}const writer=await handle.createWritable();let written=0;try{const reader=blob.stream().getReader();while(true){const {done,value}=await reader.read();if(done)break;await writer.write(value);written+=value.byteLength;setDocStatus(doc,'yellow',`整合寫入 ${Math.round(written/Math.max(1,blob.size)*100)}%`,10+Math.floor(written/Math.max(1,blob.size)*80))}setDocStatus(doc,'yellow','整合提交：確認原始文件',95);await writer.close()}catch(e){await writer.abort().catch(()=>{});throw e}doc.handle=handle;
+ }const revision=doc.vRevision;setDocStatus(doc,'yellow','V 與原始文件整合：準備快照',5);let blob,handle=doc.handle;if(doc.encodingWarning){try{const converted=await convertLegacyDocument(doc,forceEncoding);blob=converted.blob;if(converted.lossy)this.emit('EncodingConverter','強制儲存替代字元數：'+converted.lossy)}catch(e){throw Error('ENCODING_CONVERSION_FAILED:'+e.message)}setDocStatus(doc,'yellow','已還原 '+doc.encoding+' 原始編碼，準備寫入',8)}else blob=await doc.exportBlob();try{if(saveAs||!handle?.createWritable){if(!window.showSaveFilePicker)throw Error('瀏覽器不支援直接存檔，請使用支援 File System Access API 的瀏覽器');handle=await showSaveFilePicker({suggestedName:doc.name})}const writer=await handle.createWritable();let written=0;try{const reader=blob.stream().getReader();while(true){const {done,value}=await reader.read();if(done)break;await writer.write(value);written+=value.byteLength;setDocStatus(doc,'yellow',`整合寫入 ${Math.round(written/Math.max(1,blob.size)*100)}%`,10+Math.floor(written/Math.max(1,blob.size)*80))}setDocStatus(doc,'yellow','整合提交：確認原始文件',95);await writer.close()}catch(e){await writer.abort().catch(()=>{});throw e}doc.handle=handle;
  // The file has already been committed at this point. A subsequent index
  // failure is NOT a save failure and must never close the open editor tab.
  doc.file=await handle.getFile();doc.size=doc.file.size;
@@ -381,7 +403,7 @@ fm.onChange(()=>{tabs();if(document.activeElement!==editor||shownDoc!==fm.active
 function setLoad(msg){$('clusterLoad').hidden=false;$('loadLabel').textContent=msg;$('loadPercent').textContent='';$('loadDetail').textContent=''}
 async function render(){const d=fm.active,t=++token;if(!d)return;shownDoc=d;editor.disabled=!d.indexComplete&&d.size>=100000;try{if(d.size<100000){editor.value=d.vOperations.length?([ ...d.vOperations ].reverse().find(x=>x.kind==='small')?.text??await d.getAllSmall()):d.mutations.length?d.mutations.at(-1).text:await d.getAllSmall();if(t!==token)return;start=1;const n=editor.value.split('\n').length;lastSmallText=editor.value;renderGutter(1,n);$('clusterLoad').hidden=true;return}if(!d.indexComplete){editor.disabled=true;editor.value='正在建立行號索引…';gutter.textContent='';setLoad('Indexing');if(!d.indexPromise)d.indexPromise=d.index(p=>{if(fm.active===d){$('loadLabel').textContent='Indexing';$('loadPercent').textContent=(p*100).toFixed(1)+'%'}}).then(()=>{if(fm.active===d)void render()}).catch(e=>emit('SegmentLoader','ERROR PR6:001 '+e.message)).finally(()=>{d.indexPromise=null});return}const lines=await d.getLines(start,count);if(t!==token)return;d.currentBaseLines=await d.getBaseWindowLines(start,count);if(t!==token)return;editor.value=d.pendingView&&d.pendingView.start===start?d.pendingView.text:lines.join('\n');renderGutter(start,editor.value.split('\n').length);setLoad(`Visible ${start}–${start+lines.length-1}`)}catch(e){emit('SegmentLoader','ERROR PR6:001 '+e.message)}}
 const action={new:()=>fm.create(),open:async()=>{try{if(window.showOpenFilePicker && window.isSecureContext){try{const handles=await window.showOpenFilePicker({multiple:true});for(const handle of handles){const file=await handle.getFile();await fm.open(file,handle);emit('FileManager',`External watch active: ${file.name}`)}await pollExternal();return}catch(err){if(err.name==='AbortError')return;emit('FileManager',`Native picker fallback: ${err.message}`)}}const picker=$('fileInput');if(!picker)throw Error('fileInput missing');picker.value='';picker.click();emit('FileManager','Open file picker requested')}catch(e){emit('FileManager','ERROR OPEN: '+e.message)}},save:()=>save(false),saveas:()=>save(true),saveall:async()=>{for(const d of fm.docs)await save(false,d)},closeall:()=>{if(fm.docs.some(d=>d.dirty)&&!confirm('有未儲存文件，確定全部關閉？'))return;for(const d of [...fm.docs])fm.close(d.id);window.ClusterTerminal?.closeAll?.();window.ClusterAI?.closeAll?.()}};
-async function save(as=false,doc=fm.active){if(!doc)return;try{if(doc.pendingView&&doc.size<100000){await doc.replaceLines(doc.pendingView.start,doc.pendingView.end,doc.pendingView.text);doc.pendingView=null}await flushV(doc);editor.disabled=true;try{await fm.save(doc,as)}catch(e){if(String(e.message).startsWith('V_ACTUAL_CONFLICT:')){const ok=confirm('偵測到實際 V 編輯範圍衝突。強制合併會依最新編輯覆蓋衝突區域，可能遺失較早的衝突修改。V 紀錄在儲存成功前仍會保留。是否強制合併？');if(ok)await fm.save(doc,as,true);else emit('FileManager','已取消強制合併；V 紀錄保留')}else if(String(e.message).startsWith('ENCODING_CONVERSION_FAILED:')){const ok=confirm('自動轉碼失敗：'+e.message.slice(27)+'\n\n是否強制轉換？無法解碼的字元可能損毀。將另存 UTF-8 副本，原始檔不會自動覆寫。');if(ok)await fm.save(doc,true,false,true);else emit('FileManager','取消強制轉碼，原始檔與編輯保留')}else throw e}finally{editor.disabled=false}tabs()}catch(e){emit('FileManager','ERROR '+e.message)}}
+async function save(as=false,doc=fm.active){if(!doc)return;try{if(doc.pendingView&&doc.size<100000){await doc.replaceLines(doc.pendingView.start,doc.pendingView.end,doc.pendingView.text);doc.pendingView=null}await flushV(doc);editor.disabled=true;try{await fm.save(doc,as)}catch(e){if(String(e.message).startsWith('V_ACTUAL_CONFLICT:')){const ok=confirm('偵測到實際 V 編輯範圍衝突。強制合併會依最新編輯覆蓋衝突區域，可能遺失較早的衝突修改。V 紀錄在儲存成功前仍會保留。是否強制合併？');if(ok)await fm.save(doc,as,true);else emit('FileManager','已取消強制合併；V 紀錄保留')}else if(String(e.message).startsWith('ENCODING_CONVERSION_FAILED:')){const choice=prompt('原始編碼儲存失敗：'+e.message+'\\n請選擇：1=直接強制覆寫、2=備份後強制覆寫、3=另存副本、其他=取消','2');if(choice==='1'){if(confirm('直接強制覆寫可能遺失無法編碼的字元，確定？'))await fm.save(doc,false,false,true)}else if(choice==='2'){if(!window.showSaveFilePicker)throw Error('瀏覽器不支援備份');const backup=await showSaveFilePicker({suggestedName:doc.name+'.original-backup'});const writer=await backup.createWritable();try{await writer.write(doc.file);await writer.close()}catch(err){await writer.abort().catch(()=>{});throw err}const checked=await backup.getFile();if(checked.size!==doc.file.size)throw Error('備份驗證失敗，禁止覆寫');await fm.save(doc,false,false,true)}else if(choice==='3')await fm.save(doc,true,false,true);else emit('FileManager','已取消強制儲存')}else throw e}finally{editor.disabled=false}tabs()}catch(e){emit('FileManager','ERROR '+e.message)}}
 $('fileButton').onclick=()=>{if(!$('fileMenu').hidden){/* closing */}else{$('blockDirectory').hidden=true;$('blockDirectoryButton').setAttribute('aria-expanded','false')} $('fileMenu').hidden=!$('fileMenu').hidden;$('fileButton').setAttribute('aria-expanded',String(!$('fileMenu').hidden))};$('fileMenu').addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;$('fileMenu').hidden=true;action[b.dataset.action]?.()});document.addEventListener('pointerdown',e=>{if(!e.target.closest('.menu-wrap'))$('fileMenu').hidden=true});
 $('fileInput').onchange=async e=>{const files=Array.from(e.target.files||[]);e.target.value='';for(const f of files){try{emit('FileManager',`Opening ${f.name}`);await fm.open(f);emit('FileManager',`Opened ${f.name}; external watch unavailable (File input has no persistent handle)`)}catch(err){emit('FileManager',`ERROR OPEN ${f.name}: ${err.message}`)}}};
 // [FIX-PR8] Center target line and prefetch surrounding slice window.
