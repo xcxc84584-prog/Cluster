@@ -466,6 +466,15 @@ async function pollExternal(){if(externalSyncBusy||document.hidden)return;extern
  }finally{externalSyncBusy=false}}
 setInterval(pollExternal,2500);window.addEventListener('focus',pollExternal);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollExternal()});
 
+// P3.4: explicitly opened editor documents only; no filesystem traversal.
+window.ClusterReadOnlyBridge=Object.freeze({
+ listFiles(){return fm.docs.map(d=>({id:d.id,name:d.name,size:d.size,dirty:!!d.dirty,active:fm.active===d}));},
+ getEditorState(){return {activeId:fm.active?.id||null,activeName:fm.active?.name||null,openTabs:fm.docs.length};},
+ async readFile(id){const d=fm.docs.find(x=>x.id===id);if(!d)throw Error('Document not open in Cluster');
+  if(d.dirty||d.vOperations?.length||d.pendingView)throw Error('Unsaved edits present; snapshot unavailable');
+  if(d.size>262144)throw Error('Read limit 256 KiB; large file requires chunked API');
+  return {id:d.id,name:d.name,text:await d.file.text(),dirty:false};}
+});
 window.addEventListener('beforeunload',e=>{if(fm.docs.some(d=>d.dirty)){e.preventDefault();e.returnValue=''}});
 
 })();
