@@ -67,3 +67,38 @@
 - 用戶端與 Token 存在記憶體，服務重啟後需要重新註冊／授權。
 - 正式公開前仍需加強全域速率限制、稽核與安全測試。
 - 現有工具僅提供唯讀操作，尚未提供寫入或 PowerShell 權限。
+
+
+## 7. 新手版：一鍵安裝與 OAuth 本機安全檢查（P3.7.1）
+
+### 在 Cluster AI Agent 頁面操作
+
+1. 開啟 Cluster 網頁，按「AI Agent」，完成本地 BIND。
+2. 點「下載一鍵啟動 CMD」，執行後輸入 Y，取得 Cloudflare HTTPS 網址（既有 MCP 測試流程）。
+3. 點「下載 OAuth 本機測試 CMD」，雙擊執行。這會下載 Gateway 程式並在 43881 執行**短暫本機測試**，不會改動既有 Tunnel。
+4. 等待出現 LOCAL CHECKS PASSED；若失敗，複製錯誤文字回報，不要提供 Token 或密碼。
+5. 測試完會自動關閉測試用 Gateway。此時**還不能**在 ChatGPT 完成 OAuth 連線。
+
+### 一鍵測試會檢查什麼？
+
+- Node.js 20+ 是否存在，以及 Gateway 程式語法是否正確。
+- OAuth 服務中繼資料與 PKCE S256。
+- MCP 受保護資源中繼資料。
+- 沒有授權的 MCP 請求必須回應 HTTP 401。
+- 不安全的 HTTP redirect URI 必須拒絕（HTTP 400）。
+- 合法的本機回呼網址可註冊 OAuth public client。
+
+**安全注意：** CMD 會從 GitHub 下載並執行 PowerShell 腳本，腳本再下載 Node.js 程式；請只從自己的 Cluster 官方儲存庫取得檔案並檢查來源。測試尚未涵蓋完整 PKCE 換取 Token、授權同意 UI、外部 TLS/OAuth 或正式部署安全驗收。
+
+### ChatGPT MCP 操作（OAuth 部署完成後）
+
+1. ChatGPT →「外掛程式」→右上「新增」→「新增自訂 MCP 伺服器」。
+2. 名稱 Cluster，說明 Cluster Local IDE Remote MCP。
+3. MCP URL 填入固定 HTTPS 網域的 /mcp；不要再使用原本的 43880 Quick Tunnel URL。
+4. 身分驗證選 OAuth，按照授權畫面輸入**本機授權密碼**，只在確認為自己固定網域的頁面操作。
+5. 成功建立後，先測試 cluster.get_status 與 cluster.list_files，再測試 cluster.read_file。
+6. 若未通過，停止在此，不要選無驗證、不要貼出密碼、Token 或完整授權資訊。
+
+### 目前限制
+
+P3.7.1 的一鍵腳本已提交 GitHub，但尚未在使用者 Windows 環境執行；不能將程式存在視為 PASS。要完成 ChatGPT OAuth 仍需固定網域、Named Tunnel、完整端到端驗證與正式安全審核。
