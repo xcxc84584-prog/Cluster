@@ -40,22 +40,44 @@ if(!$check){
  Write-Host '[2/3] Existing local MCP is running. Reusing it.' -ForegroundColor Green
 }
 Write-Host ('[3/3] Local MCP ready: '+$check.result.tools.Count+' tools.') -ForegroundColor Green
-$cmd=Get-Command cloudflared -ErrorAction SilentlyContinue
-if(!$cmd){
- Write-Host 'cloudflared not found. Install it from the official Cloudflare package.' -ForegroundColor Yellow
- Write-Host 'Run: winget install --id Cloudflare.cloudflared -e'
- $answer=Read-Host 'Install cloudflared using winget now? (Y/N)'
- if($answer -notin @('Y','y')){exit 1}
- & winget install --id Cloudflare.cloudflared -e
- if($LASTEXITCODE -ne 0){throw 'cloudflared installation failed'}
- $cmd=Get-Command cloudflared -ErrorAction SilentlyContinue
- if(!$cmd){
-  $locations=@("$env:ProgramFiles\cloudflared\cloudflared.exe","$env:LOCALAPPDATA\Microsoft\WinGet\Links\cloudflared.exe")
-  $found=$locations|Where-Object {Test-Path $_}|Select-Object -First 1
-  if(!$found){throw 'Restart PowerShell and rerun after installation.'}
-  $exe=$found
- }else{$exe=$cmd.Source}
-}else{$exe=$cmd.Source}
+function Find-Cloudflared {
+ $cmd=Get-Command cloudflared.exe -ErrorAction SilentlyContinue
+ if($cmd -and $cmd.Source -and (Test-Path -LiteralPath $cmd.Source)){return $cmd.Source}
+ $paths=@(
+  (Join-Path $env:ProgramFiles 'cloudflared\cloudflared.exe'),
+  (Join-Path $env:ProgramFiles 'Cloudflare\cloudflared.exe'),
+  (Join-Path $env:ProgramFiles 'Cloudflare\Cloudflared\cloudflared.exe'),
+  (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links\cloudflared.exe'),
+  (Join-Path $env:LOCALAPPDATA 'Programs\cloudflared\cloudflared.exe'),
+  (Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\cloudflared.exe')
+ )
+ foreach($candidate in $paths){if(Test-Path -LiteralPath $candidate){return $candidate}}
+ foreach($root in @($env:ProgramFiles, $env:LOCALAPPDATA)){
+  if(!$root -or !(Test-Path $root)){continue}
+  $found=Get-ChildItem -LiteralPath $root -Filter 'cloudflared.exe' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+  if($found){return $found.FullName}
+ }
+ return $null
+}
+$exe=Find-Cloudflared
+if(!$exe){
+ Write-Host 'cloudflared executable not found. Checking installed package...' -ForegroundColor Yellow
+ $installed=(& winget list --id Cloudflare.cloudflared -e --accept-source-agreements 2>$null | Out-String)
+ if($installed -match 'Cloudflare\.cloudflared'){
+  Write-Host 'cloudflared is installed but its executable is not on PATH.' -ForegroundColor Yellow
+ }else{
+  $answer=Read-Host 'Install cloudflared using winget now? (Y/N)'
+  if($answer -notmatch '^(?i:y|yes)$'){exit 1}
+  & winget install --id Cloudflare.cloudflared -e --accept-package-agreements --accept-source-agreements
+ }
+ $exe=Find-Cloudflared
+}
+if(!$exe){
+ Write-Host 'cloudflared is installed but its executable could not be located automatically.' -ForegroundColor Yellow
+ $manual=Read-Host 'Enter full path to cloudflared.exe (or press Enter to exit)'
+ if($manual -and (Test-Path -LiteralPath $manual -PathType Leaf)){$exe=$manual}else{throw 'Cannot find cloudflared.exe. Check the installed application path.'}
+}
+Write-Host ('cloudflared ready: '+$exe) -ForegroundColor Green
 Write-Host ''
 Write-Host 'IMPORTANT: A temporary tunnel URL is NOT sufficient to register a ChatGPT connector.' -ForegroundColor Yellow
 Write-Host 'ChatGPT may require OAuth and a stable HTTPS URL. Never paste bearer tokens into chats.'
