@@ -58,16 +58,17 @@ function translateSyntaxUI(){
 document.getElementById('uiLanguage')?.addEventListener('change',translateSyntaxUI);
 let pageActive=false;
 function setupSyntaxPage(){
+ let pageOpened=false;
  const page=document.getElementById('syntaxEditorPage'),button=document.getElementById('syntaxOpenPage');
  const tabs=document.getElementById('tabList'),shell=document.getElementById('editorShell'),empty=document.getElementById('empty');
  if(!page||!button||!tabs||!shell||!empty)return;
  function sync(){
   let tab=tabs.querySelector('[data-tab-key="plugin:syntax"]');
-  if(!tab&&pageActive){
+  if(!tab&&pageOpened){
    tab=document.createElement('div');tab.className='tab';tab.dataset.tabKey='plugin:syntax';
    const open=document.createElement('button');open.type='button';open.className='tab-select';open.textContent='🎨 '+syntaxT('title');
    open.onclick=activate;
-   const close=document.createElement('button');close.type='button';close.className='tab-close';close.textContent='×';close.onclick=deactivate;
+   const close=document.createElement('button');close.type='button';close.className='tab-close';close.textContent='×';close.onclick=closePage;
    tab.append(open,close);tabs.append(tab);
   }
   if(tab)tab.classList.toggle('is-active',pageActive);
@@ -75,16 +76,18 @@ function setupSyntaxPage(){
   if(pageActive){shell.hidden=true;empty.hidden=true;document.getElementById('clusterBottomBar').hidden=true}
  }
  function activate(){
-  pageActive=true;window.ClusterTerminal?.deactivate?.();window.ClusterAI?.deactivate?.();
+  pageOpened=true;pageActive=true;window.ClusterTerminal?.deactivate?.();window.ClusterAI?.deactivate?.();
   document.getElementById('fileMenu').hidden=true;sync();
  }
  function deactivate(){
   pageActive=false;page.hidden=true;
-  const tab=tabs.querySelector('[data-tab-key="plugin:syntax"]');tab?.remove();
-  shell.hidden=!window.cluster?.fm?.active;
-  empty.hidden=!!window.cluster?.fm?.active;
-  document.getElementById('clusterBottomBar').hidden=!window.cluster?.fm?.active;
+  const tab=tabs.querySelector('[data-tab-key="plugin:syntax"]');tab?.classList.remove('is-active');
+  const other=!!document.body.classList.contains('cluster-terminal-active')||!!window.ClusterAI?.isActive?.();
+  shell.hidden=other||!window.cluster?.fm?.active;
+  empty.hidden=other||!!window.cluster?.fm?.active;
+  document.getElementById('clusterBottomBar').hidden=other||!window.cluster?.fm?.active;
  }
+ function closePage(){pageOpened=false;deactivate();tabs.querySelector('[data-tab-key="plugin:syntax"]')?.remove();}
  button.onclick=activate;translateSyntaxUI();
  window.ClusterSyntaxPage={activate,deactivate,sync};
 }
