@@ -23,6 +23,8 @@
  el.addEventListener('input',schedule);el.addEventListener('keyup',schedule);el.addEventListener('scroll',schedule);fm.onChange(schedule);
  window.addEventListener('pagehide',()=>{void checkpoint()});
  async function restore(){try{const session=await load('session','current');if(!session)return;
+  const choice=confirm('恢復上次的編輯視窗？\n確定：全部保留未提交的編輯紀錄（V Journal）\n取消：刪除上次工作階段的未提交編輯紀錄。\n注意：刪除後無法復原。');
+  window.ClusterRestoreVPolicy=choice?'keep':'discard';
   for(const id of session.ids||[]){const record=await load('documents',id);if(!record)continue;let file=null,handle=record.handle;
    if(handle){try{if(await handle.queryPermission({mode:'read'})==='granted')file=await handle.getFile()}catch{}}
    if(!file&&record.content!==null)file=new File([record.content],record.name,{lastModified:record.lastModified});
@@ -33,6 +35,6 @@
   }
   const active=fm.docs.find(d=>key(d)===session.active);if(active)fm.select(active.id);
   if(active){window.ClusterWorkspaceViewport?.set?.(active,active._viewportStart||1);if(active.size<100000)setTimeout(()=>{el.setSelectionRange(Math.min(session.selection||0,el.value.length),Math.min(session.selection||0,el.value.length));el.scrollTop=session.scroll||0},150)}
- }catch(e){window.cluster.emit('Workspace','Restore ERROR '+e.message)}finally{restoring=false}}
+ }catch(e){window.cluster.emit('Workspace','Restore ERROR '+e.message)}finally{delete window.ClusterRestoreVPolicy;restoring=false}}
  restore();
 })();
