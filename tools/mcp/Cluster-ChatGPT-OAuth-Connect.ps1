@@ -1,5 +1,5 @@
 $ErrorActionPreference='Stop'
-Write-Host 'Cluster ChatGPT OAuth Connect - P3.8' -ForegroundColor Cyan
+Write-Host 'Cluster ChatGPT OAuth Connect - P3.8.2' -ForegroundColor Cyan
 Write-Host 'This creates a temporary OAuth HTTPS endpoint for testing. Keep this window open.' -ForegroundColor Yellow
 $base=Join-Path $env:LOCALAPPDATA 'ClusterTerminalAgent'
 $gateway=Join-Path $base 'app\oauth-mcp-gateway.cjs'
@@ -28,7 +28,37 @@ try{
 $token=Join-Path $base 'remote-mcp-token'
 if(!(Test-Path -LiteralPath $token)){throw 'Missing local MCP token. Start Cluster MCP first.'}
 $oauthPort=43881
-if(Get-NetTCPConnection -LocalPort $oauthPort -State Listen -ErrorAction SilentlyContinue){throw 'Port 43881 is already in use. Close previous OAuth Gateway.'}
+# Never terminate a port owner without explicit confirmation and identity checks.
+$listeners=@(Get-NetTCPConnection -LocalPort $oauthPort -State Listen -ErrorAction SilentlyContinue)
+if($listeners.Count -gt 0){
+ $owners=@($listeners | Select-Object -ExpandProperty OwningProcess -Unique)
+ if($owners.Count -ne 1){throw 'Multiple processes own port 43881. Resolve the conflict manually.'}
+ $ownerId=[int]$owners[0]
+ $owner=Get-CimInstance Win32_Process -Filter "ProcessId = $ownerId" -ErrorAction Stop
+ if(!$owner){throw 'Could not identify the process on port 43881.'}
+ Write-Host ''
+ Write-Host 'Port 43881 is already in use:' -ForegroundColor Yellow
+ Write-Host ('PID: '+$ownerId)
+ Write-Host ('Process: '+$owner.Name)
+ Write-Host ('Command: '+$owner.CommandLine)
+ $expected=($owner.Name -in @('node.exe','node')) -and ($owner.CommandLine -match 'oauth-mcp-gateway[.]cjs')
+ if(!$expected){throw 'Port 43881 is owned by an unrecognized process. Refusing to stop it automatically.'}
+ $answer=Read-Host 'Stop this existing Cluster OAuth Gateway and continue? (Y/N)'
+ if($answer -cne 'Y' -and $answer -cne 'y'){throw 'Cancelled. Existing Gateway was not changed.'}
+ # Revalidate PID identity and ownership immediately before termination.
+ $again=Get-CimInstance Win32_Process -Filter "ProcessId = $ownerId" -ErrorAction SilentlyContinue
+ $still=@(Get-NetTCPConnection -LocalPort $oauthPort -State Listen -ErrorAction SilentlyContinue | Where-Object OwningProcess -eq $ownerId)
+ if(!$again -or $again.CreationDate -ne $owner.CreationDate -or $again.CommandLine -ne $owner.CommandLine -or $still.Count -eq 0){
+  throw 'Process changed while waiting for confirmation. Nothing was stopped.'
+ }
+ Stop-Process -Id $ownerId -Force -ErrorAction Stop
+ for($i=0;$i -lt 20;$i++){
+  if(-not (Get-NetTCPConnection -LocalPort $oauthPort -State Listen -ErrorAction SilentlyContinue)){break}
+  Start-Sleep -Milliseconds 250
+ }
+ if(Get-NetTCPConnection -LocalPort $oauthPort -State Listen -ErrorAction SilentlyContinue){throw 'Port 43881 is still occupied after stopping the old Gateway.'}
+ Write-Host 'Old Cluster OAuth Gateway stopped. Continuing...' -ForegroundColor Green
+}
 $log=Join-Path $env:TEMP ('Cluster-OAuth-Tunnel-'+[guid]::NewGuid().ToString('N')+'.log')
 $err=Join-Path $env:TEMP ('Cluster-OAuth-Tunnel-'+[guid]::NewGuid().ToString('N')+'.err.log')
 $gatewayLog=Join-Path $env:TEMP ('Cluster-OAuth-Gateway-'+[guid]::NewGuid().ToString('N')+'.log')
