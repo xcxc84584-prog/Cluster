@@ -86,5 +86,42 @@ Write-Host 'IMPORTANT: A temporary tunnel URL is NOT sufficient to register a Ch
 Write-Host 'ChatGPT may require OAuth and a stable HTTPS URL. Never paste bearer tokens into chats.'
 $confirm=Read-Host 'Start temporary HTTPS tunnel? (Y/N)'
 if($confirm -notin @('Y','y')){exit 0}
-Write-Host 'Look for https://...trycloudflare.com in the output. Keep this window open.' -ForegroundColor Cyan
-& $exe tunnel --url http://127.0.0.1:43880 --no-autoupdate
+Write-Host 'Starting Cloudflare Tunnel and detecting its public MCP URL...' -ForegroundColor Cyan
+$log=Join-Path $env:TEMP ('Cluster-cloudflared-'+[guid]::NewGuid().ToString('N')+'.log')
+$errLog=Join-Path $env:TEMP ('Cluster-cloudflared-'+[guid]::NewGuid().ToString('N')+'.err.log')
+$proc=$null
+try {
+ $proc=Start-Process -FilePath $exe -ArgumentList @('tunnel','--url','http://127.0.0.1:43880','--no-autoupdate') -RedirectStandardOutput $log -RedirectStandardError $errLog -PassThru -WindowStyle Hidden
+ $found=$null
+ $printed=0
+ while(-not $proc.HasExited) {
+  Start-Sleep -Milliseconds 500
+  $lines=@()
+  if(Test-Path -LiteralPath $errLog){$lines+=@(Get-Content -LiteralPath $errLog -ErrorAction SilentlyContinue)}
+  if(Test-Path -LiteralPath $log){$lines+=@(Get-Content -LiteralPath $log -ErrorAction SilentlyContinue)}
+  if($lines.Count -gt $printed){
+   foreach($line in $lines[$printed..($lines.Count-1)]){
+    if($line -match 'https://[a-zA-Z0-9-]+\.trycloudflare\.com'){
+     if(!$found){
+      $found=$Matches[0].TrimEnd('/','|')
+      Write-Host ''
+      Write-Host '========================================' -ForegroundColor Green
+      Write-Host 'Cluster MCP HTTPS Ready' -ForegroundColor Green
+      Write-Host 'MCP URL:' -ForegroundColor Cyan
+      Write-Host ($found+'/mcp') -ForegroundColor White
+      Write-Host 'Keep this window open. Press Ctrl+C to stop the tunnel.' -ForegroundColor Yellow
+      Write-Host '========================================' -ForegroundColor Green
+      Write-Host ''
+     }
+    }elseif($line -match ' ERR | error |failed|Registered tunnel connection'){
+     Write-Host $line
+    }
+   }
+   $printed=$lines.Count
+  }
+ }
+ if(!$found){throw ('cloudflared exited before a public URL was detected (exit code '+$proc.ExitCode+'). Check tunnel logs.')}
+}finally{
+ if($proc -and -not $proc.HasExited){Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue}
+ Remove-Item -LiteralPath $log,$errLog -Force -ErrorAction SilentlyContinue
+}
