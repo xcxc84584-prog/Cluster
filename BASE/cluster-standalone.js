@@ -16,7 +16,46 @@ class SegmentDocument {
  async getSlice(i){if(i<0||i>=this.nodes.length)return '';if(this.cache.has(i))return this.cache.get(i);const node=this.nodes[i];const text=decoder.decode(await this.file.slice(node.start,node.end).arrayBuffer());this.cache.set(i,text);if(this.cache.size>this.cacheLimit)this.cache.delete(this.cache.keys().next().value);return text}
  async textRange(start,end){start=Math.max(0,start);end=Math.min(this.size,end);if(end<=start)return '';return decoder.decode(await this.file.slice(start,end).arrayBuffer())}
  async index(onProgress=()=>{}){if(this.indexing)return;this.indexing=true;let offset=0,carryCR=false;const block=1024*1024;try{while(offset<this.size){const end=Math.min(this.size,offset+block);const bytes=new Uint8Array(await this.file.slice(offset,end).arrayBuffer());for(let i=0;i<bytes.length;i++){if(bytes[i]===10)this.lineStarts.push(offset+i+1)}offset=end;this.indexedBytes=offset;this.indexedLines=this.lineStarts.length;onProgress(offset/Math.max(1,this.size));if(offset%(8*block)===0)await new Promise(r=>setTimeout(r,0))}this.indexComplete=true;this.emit('SegmentLoader',`Index complete,lines:${this.lineStarts.length}`)}catch(e){this.emit('SegmentLoader',`ERROR PR6:001 ${e.message}`);throw e}finally{this.indexing=false}}
- async getLines(first,count){if(this.vOperations.length){const overlay=[...this.vOperations].reverse().find(x=>x.kind==='window'&&x.start===first&&x.count===count);if(overlay)return overlay.text.split('\n')} if(!this.indexComplete&&first>this.indexedLines)throw Error('行號索引尚未完成');const start=this.lineStarts[Math.max(0,first-1)]??this.size;/* [FIX-PR1-001] End of requested line window is EOF when no subsequent newline exists. */const nextLineIndex=first+count-1;const end=nextLineIndex<this.lineStarts.length?this.lineStarts[nextLineIndex]:this.size;let text=await this.textRange(start,end);let lines=text.split('\n');return lines.slice(0,count).map(s=>s.endsWith('\r')?s.slice(0,-1):s)}
+ async getLines(first,count){
+  if(!this.indexComplete&&first>this.indexedLines)throw Error('行號索引尚未完成');
+  // Rebuild every requested viewport from Base + ALL V edits. An exact
+  // start/count lookup loses changes when the viewport moves or shifts.
+  const base=await this.getBaseWindowLines(first,count);
+  if(!this.vOperations.length)return base;
+  const latest=new Map();
+  for(const op of this.vOperations)
+   if(op.kind==='window'&&Number.isInteger(op.start)&&Number.isInteger(op.count)&&op.count>0&&typeof op.text==='string')
+    latest.set(op.start+':'+op.count,op);
+  const edits=[];
+  for(const op of latest.values()){
+   const n=Math.min(op.count,Math.max(0,this.lineStarts.length-op.start+1));
+   if(!n)continue;
+   const old=await this.getBaseWindowLines(op.start,n);
+   const updated=op.text.split('\n').map(x=>x.replace(/\r$/,''));
+   let pre=0,suf=0;
+   while(pre<old.length&&pre<updated.length&&old[pre]===updated[pre])pre++;
+   while(suf<old.length-pre&&suf<updated.length-pre&&old[old.length-1-suf]===updated[updated.length-1-suf])suf++;
+   const line=op.start+pre,removed=old.length-pre-suf,added=updated.slice(pre,updated.length-suf);
+   if(removed||added.length)edits.push({line,removed,added,order:op.id||0});
+  }
+  edits.sort((a,b)=>b.order-a.order);
+  const selected=[];
+  for(const e of edits){
+   const overlaps=selected.some(p=>(e.line<p.line+p.removed&&p.line<e.line+e.removed)||
+    (e.removed===0&&p.line<=e.line&&e.line<p.line+p.removed)||
+    (p.removed===0&&e.line<=p.line&&p.line<e.line+e.removed)||
+    (e.removed===0&&p.removed===0&&e.line===p.line));
+   if(!overlaps)selected.push(e);
+  }
+  selected.sort((a,b)=>b.line-a.line);
+  const lines=base.slice();
+  for(const e of selected){
+   // Insertions exactly at the trailing boundary belong to the next page.
+   if(e.line<first||e.line>=first+count)continue;
+   lines.splice(e.line-first,e.removed,...e.added);
+  }
+  return lines;
+ }
  async getBaseWindowLines(first,count){const begin=this.lineStarts[first-1]??this.size;const end=this.lineStarts[first+count-1]??this.size;return (await this.textRange(begin,end)).split('\n').slice(0,count).map(x=>x.replace(/\r$/,''))}
  async getAllSmall(){return this.file.text()}
  async replaceLines(start,end,newText){if(!this.indexComplete)throw Error('需等待索引完成');if(start<1||end<start||end>this.lineStarts.length)throw Error('行號範圍無效');const old=await this.getLines(start,end-start+1);const before=this.lineStarts[start-1];const after=this.lineStarts[end]??this.size;const replacement=newText+(after<this.size?'\n':'');this.mutations.push({start:before,end:after,text:replacement,old:old.join('\n')});this.mutations.sort((a,b)=>a.start-b.start);this.version++;const delta=newText.split('\n').length-(end-start+1);for(const block of this.blocks.values()){if(block.start> end){block.start+=delta;block.end+=delta}else if(block.end>=start){block.end+=delta;if(block.start>start)block.start=start}}return {delta,version:this.version}}
