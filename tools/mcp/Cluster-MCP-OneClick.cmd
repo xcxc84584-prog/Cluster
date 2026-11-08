@@ -1,9 +1,9 @@
 @echo off
 setlocal
 title Cluster MCP - One Click
-echo Cluster MCP Setup - v20261108-cachefix
+echo Cluster MCP Setup - v20261108-pathfix-2
 set "SCRIPT=%TEMP%\Cluster-MCP-HTTPS-%RANDOM%.ps1"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/95fbd1479d52dac248805da4d09afa1f85347d96/tools/mcp/Cluster-MCP-HTTPS.ps1' -OutFile '%SCRIPT%' -ErrorAction Stop } catch { Write-Host $_.Exception.Message; exit 1 }"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/914e21cb0ebf418e389047ad657eff445c8b5e2f/tools/mcp/Cluster-MCP-HTTPS.ps1' -OutFile '%SCRIPT%' -ErrorAction Stop } catch { Write-Host $_.Exception.Message; exit 1 }"
 if errorlevel 1 (echo Download failed. & pause & exit /b 1)
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%"
 set "RESULT=%ERRORLEVEL%"
