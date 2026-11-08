@@ -87,6 +87,13 @@ $('uiLanguage')?.addEventListener('change',localize);localize();
 // Editor's tabs() rebuilds #tabList via replaceChildren. Keep this tab alive
 // across file changes without forcing the Development panel back on top.
 window.cluster?.fm?.onChange?.(()=>{if(opened)ensureTab();});
+// Toolbar navigation also changes views without selecting a tab.
+document.addEventListener('click',event=>{
+ if(!opened||!active)return;
+ const button=event.target.closest('button');
+ if(!button)return;
+ if(button.id==='terminalNew'||button.id==='terminalConnect'||button.id==='terminalClose'||button.id==='terminalDismissGuide'||button.id==='terminalButton'||button.id==='powershellButton'||button.dataset.action==='new'||button.dataset.action==='open')deactivate();
+},true);
 tabs.addEventListener('click',event=>{
  const clicked=event.target.closest('.tab');
  if(!clicked||clicked===tab||!opened)return;
