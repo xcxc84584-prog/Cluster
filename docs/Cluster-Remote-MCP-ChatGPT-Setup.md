@@ -102,3 +102,7 @@
 ### 目前限制
 
 P3.7.1 的一鍵腳本已提交 GitHub，但尚未在使用者 Windows 環境執行；不能將程式存在視為 PASS。要完成 ChatGPT OAuth 仍需固定網域、Named Tunnel、完整端到端驗證與正式安全審核。
+
+## 8. Windows cloudflared 路徑修復（2026-11-08）
+
+舊版 Cluster-MCP-OneClick.cmd 曾固定下載舊版 PowerShell 腳本，即使主分支的 cloudflared 搜尋已修正，仍可能顯示 executable not found。新版 CMD 標題應顯示 `v20261108-pathfix-2`，已固定下載含 `C:\Program Files (x86)\cloudflared\cloudflared.exe` 的新版腳本。新版避免遞迴掃描整個 Program Files / AppData。若仍失敗，請執行 `where.exe cloudflared`，確認路徑並回報；不必重新安裝 cloudflared。
