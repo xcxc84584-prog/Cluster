@@ -1,12 +1,12 @@
 $ErrorActionPreference='Stop'
-Write-Host 'Cluster ChatGPT OAuth Connect - P3.8.2' -ForegroundColor Cyan
+Write-Host 'Cluster ChatGPT OAuth Connect - P3.8.3' -ForegroundColor Cyan
 Write-Host 'This creates a temporary OAuth HTTPS endpoint for testing. Keep this window open.' -ForegroundColor Yellow
 $base=Join-Path $env:LOCALAPPDATA 'ClusterTerminalAgent'
 $gateway=Join-Path $base 'app\oauth-mcp-gateway.cjs'
 if(!(Test-Path -LiteralPath $gateway)){throw 'Run Cluster-OAuth-OneClick.cmd local test first.'}
-Write-Host 'Updating OAuth Gateway to CSP fix P3.8.1...' -ForegroundColor Cyan
+Write-Host 'Updating OAuth Gateway to CSP redirect fix P3.8.3...' -ForegroundColor Cyan
 $gatewayDownload=$gateway+'.update.cjs'
-Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/0e9c21dc83bf261b2117fb02b04998b788685f0c/agent_terminal/oauth-mcp-gateway.cjs' -OutFile $gatewayDownload
+Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/1af593d72f735798f8c21caffdddeae91d8ae1ff/agent_terminal/oauth-mcp-gateway.cjs' -OutFile $gatewayDownload
 
 $node=(Get-Command node.exe -ErrorAction SilentlyContinue)
 if(!$node){throw 'Node.js 20+ is required.'}
