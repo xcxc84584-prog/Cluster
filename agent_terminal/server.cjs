@@ -25,6 +25,9 @@ if(fs.existsSync(tokenFile)){
  fs.writeFileSync(tokenFile,token+'\n',{flag:'wx',mode:0o600});
 }
 
+const providerFile=path.join(configDir,'ai-provider.json');
+function readProvider(){try{const p=JSON.parse(fs.readFileSync(providerFile,'utf8'));return {apiKey:p.apiKey||'',model:p.model||'gpt-4.1-mini'};}catch{return {apiKey:'',model:'gpt-4.1-mini'};}}
+function saveProvider(p){fs.writeFileSync(providerFile,JSON.stringify(p),{mode:0o600});}
 const MAX_SESSIONS=8,MAX_MESSAGE=65536;
 const roots=new Map();const sessions=new Map();
 const server=http.createServer((req,res)=>{res.writeHead(404,{'Content-Type':'text/plain','Cache-Control':'no-store'});res.end('Not Found');});
@@ -47,13 +50,44 @@ function validRoot(value,expected){
 }
 function closeSession(id){const s=sessions.get(id);if(!s)return; sessions.delete(id);try{s.pty.kill();}catch{} }
 wss.on('connection',ws=>{
- let authorized=false;const owned=new Set();const timeout=setTimeout(()=>{if(!authorized)ws.close(1008,'Authentication required');},10000);
+ let authorized=false;const owned=new Set();let aiTask=null;const timeout=setTimeout(()=>{if(!authorized)ws.close(1008,'Authentication required');},10000);
  ws.on('message',raw=>{
   let m;try{m=JSON.parse(raw.toString());if(!m||typeof m.type!=='string')throw Error('Invalid message');
    if(!authorized){if(m.type!=='auth'||typeof m.token!=='string'||m.token.length!==token.length||!crypto.timingSafeEqual(Buffer.from(m.token),Buffer.from(token)))throw Error('Authentication failed');authorized=true;clearTimeout(timeout);send(ws,{type:'ready',maxSessions:MAX_SESSIONS});return;}
    if(ws.clusterAgentMode){
     if(m.type==='ping'){send(ws,{type:'pong',requestId:m.requestId,at:Date.now()});return;}
-    if(m.type==='task'){const requestId=typeof m.requestId==='string'?m.requestId:'';if(!requestId||typeof m.prompt!=='string'||!m.prompt.trim()||m.prompt.length>8000)throw Error('Invalid task');send(ws,{type:'task_status',requestId,status:'failed',message:'AI provider is not configured. Connection test succeeded; model execution is not yet available.'});return;}
+    if(m.type==='provider_get'){const p=readProvider();send(ws,{type:'provider_info',configured:!!p.apiKey,model:p.model});return;}
+    if(m.type==='provider_set'){
+     if(typeof m.apiKey!=='string'||!/^sk-[\w-]{10,256}$/.test(m.apiKey)||typeof m.model!=='string'||/^[\w.:-]{1,100}$/.test(m.model)===false)throw Error('Invalid API key or model');
+     saveProvider({apiKey:m.apiKey,model:m.model});send(ws,{type:'provider_info',configured:true,model:m.model});return;
+    }
+    if(m.type==='task_cancel'){
+     if(aiTask&&m.requestId===aiTask.requestId){aiTask.controller.abort();send(ws,{type:'task_status',requestId:m.requestId,status:'interrupted',message:'Cancelled by user'});aiTask=null;}
+     return;
+    }
+    if(m.type==='task'){
+     const requestId=typeof m.requestId==='string'?m.requestId:'';
+     if(!/^[\w-]{1,100}$/.test(requestId)||typeof m.prompt!=='string'||!m.prompt.trim()||m.prompt.length>8000)throw Error('Invalid task');
+     if(aiTask)throw Error('A task is already running');
+     const provider=readProvider();
+     if(!provider.apiKey){send(ws,{type:'task_status',requestId,status:'failed',message:'Configure an OpenAI API key first.'});return;}
+     const controller=new AbortController();aiTask={requestId,controller};
+     send(ws,{type:'task_status',requestId,status:'running',message:'Requesting model response'});
+     const timer=setTimeout(()=>controller.abort(),90000);
+     (async()=>{
+      try{
+       const response=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Authorization':'Bearer '+provider.apiKey,'Content-Type':'application/json'},body:JSON.stringify({model:provider.model,messages:[{role:'system',content:'You are the Cluster IDE assistant. You cannot edit files or execute commands in this version. Respond with clear guidance.'},{role:'user',content:m.prompt}],max_completion_tokens:2048}),signal:controller.signal});
+       const data=await response.json();
+       if(!response.ok)throw Error('Model API error '+response.status+': '+String(data.error?.message||'Request failed').slice(0,250));
+       if(aiTask?.requestId!==requestId)return;
+       const answer=data.choices?.[0]?.message?.content;
+       if(typeof answer!=='string')throw Error('No text response from model');
+       send(ws,{type:'task_result',requestId,text:answer});
+       send(ws,{type:'task_status',requestId,status:'completed',message:'Completed'});
+      }catch(e){if(aiTask?.requestId===requestId)send(ws,{type:'task_status',requestId,status:e.name==='AbortError'?'interrupted':'failed',message:e.name==='AbortError'?'Request timed out':e.message});}
+      finally{clearTimeout(timer);if(aiTask?.requestId===requestId)aiTask=null;}
+     })();return;
+    }
     throw Error('Unsupported AI Agent operation');
    }
    if(m.type==='revoke'){
@@ -95,7 +129,7 @@ wss.on('connection',ws=>{
    else throw Error('Unknown operation');
   }catch(e){send(ws,{type:'error',requestId:m?.requestId,message:e.message});}
  });
- ws.on('close',()=>{clearTimeout(timeout);for(const id of owned)closeSession(id);});
+ ws.on('close',()=>{aiTask?.controller.abort();clearTimeout(timeout);for(const id of owned)closeSession(id);});
 });
 server.on('error',e=>{if(e.code==='EADDRINUSE'){console.error('Port '+PORT+' already in use. Cluster Agent may already be running. Do not start a second copy.');process.exitCode=0;}else{console.error(e);process.exitCode=1;}});
 server.listen(PORT,'127.0.0.1',()=>{
