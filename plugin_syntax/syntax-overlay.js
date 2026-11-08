@@ -42,6 +42,20 @@ function languageForFile(name){
  const suffix=Object.keys(rules).filter(x=>lower.endsWith(x)).sort((a,b)=>b.length-a.length)[0];
  return suffix?rules[suffix]:'none';
 }
+const syntaxLabels={
+ zh:{title:'文本著色器',subtitle:'管理文件副檔名與語法語言的對應規則',addHeading:'後綴規則',addHint:'選擇副檔名及對應語言',extension:'文件後綴',language:'語法語言',add:'新增規則',remove:'刪除規則',list:'重新整理列表',registered:'已註冊的後綴',selected:'已選擇',added:'已新增',removed:'已刪除',missing:'找不到後綴',empty:'尚無規則',count:'筆規則',invalid:'無效後綴'},
+ en:{title:'Syntax Highlighter',subtitle:'Manage file extensions and language highlighting rules',addHeading:'Extension rules',addHint:'Choose a file extension and syntax language',extension:'File extension',language:'Syntax language',add:'Add rule',remove:'Remove rule',list:'Refresh list',registered:'Registered extensions',selected:'Selected',added:'Added',removed:'Removed',missing:'Extension not found',empty:'No rules',count:'rules',invalid:'Invalid extension'}
+};
+function currentSyntaxLocale(){return document.getElementById('uiLanguage')?.value==='en'?'en':'zh'}
+function syntaxT(key){return syntaxLabels[currentSyntaxLocale()][key]||key}
+function translateSyntaxUI(){
+ document.querySelectorAll('[data-syntax-i18n]').forEach(el=>{el.textContent=syntaxT(el.dataset.syntaxI18n)});
+ const open=document.getElementById('syntaxOpenPage');
+ if(open)open.textContent='🎨　'+syntaxT('title');
+ const tab=document.querySelector('[data-tab-key="plugin:syntax"] .tab-select');
+ if(tab)tab.textContent='🎨 '+syntaxT('title');
+}
+document.getElementById('uiLanguage')?.addEventListener('change',translateSyntaxUI);
 let pageActive=false;
 function setupSyntaxPage(){
  const page=document.getElementById('syntaxEditorPage'),button=document.getElementById('syntaxOpenPage');
@@ -51,7 +65,7 @@ function setupSyntaxPage(){
   let tab=tabs.querySelector('[data-tab-key="plugin:syntax"]');
   if(!tab&&pageActive){
    tab=document.createElement('div');tab.className='tab';tab.dataset.tabKey='plugin:syntax';
-   const open=document.createElement('button');open.type='button';open.className='tab-select';open.textContent='🎨 Syntax Highlighter';
+   const open=document.createElement('button');open.type='button';open.className='tab-select';open.textContent='🎨 '+syntaxT('title');
    open.onclick=activate;
    const close=document.createElement('button');close.type='button';close.className='tab-close';close.textContent='×';close.onclick=deactivate;
    tab.append(open,close);tabs.append(tab);
@@ -71,7 +85,7 @@ function setupSyntaxPage(){
   empty.hidden=!!window.cluster?.fm?.active;
   document.getElementById('clusterBottomBar').hidden=!window.cluster?.fm?.active;
  }
- button.onclick=activate;
+ button.onclick=activate;translateSyntaxUI();
  window.ClusterSyntaxPage={activate,deactivate,sync};
 }
 function setupTools(){
@@ -86,23 +100,23 @@ function setupTools(){
   for(const [ext,lang] of Object.entries(rules).sort(([a],[b])=>a.localeCompare(b))){
    const item=document.createElement('button');item.type='button';item.className='syntax-ext-entry';
    item.textContent=ext+'  →  '+lang;
-   item.onclick=()=>{input.value=ext;select.value=lang;status.textContent='已選擇 / Selected: '+ext};
+   item.onclick=()=>{input.value=ext;select.value=lang;status.textContent=syntaxT('selected')+': '+ext};
    entries.append(item);
   }
-  if(!entries.childElementCount)entries.textContent='尚無規則 / No rules';
+  if(!entries.childElementCount)entries.textContent=syntaxT('empty');
  };
  const report=msg=>{status.textContent=msg;show();schedule()};
  document.getElementById('syntaxExtAdd')?.addEventListener('click',()=>{
   try{const suffix=normalizeSuffix(input.value),lang=select.value;if(!supported.includes(lang))throw Error('不支援的語言 / Unsupported language');
-   rules[suffix]=lang;saveRules();report('已新增 / Added: '+suffix+' → '+lang);
+   rules[suffix]=lang;saveRules();report(syntaxT('added')+': '+suffix+' → '+lang);
   }catch(e){status.textContent=e.message}
  });
  document.getElementById('syntaxExtRemove')?.addEventListener('click',()=>{
-  try{const suffix=normalizeSuffix(input.value);if(!(suffix in rules))throw Error('找不到後綴 / Extension not found');
-   delete rules[suffix];saveRules();report('已刪除 / Removed: '+suffix);
+  try{const suffix=normalizeSuffix(input.value);if(!(suffix in rules))throw Error(syntaxT('missing'));
+   delete rules[suffix];saveRules();report(syntaxT('removed')+': '+suffix);
   }catch(e){status.textContent=e.message}
  });
- document.getElementById('syntaxExtList')?.addEventListener('click',()=>{show();status.textContent='已列出 '+Object.keys(rules).length+' 筆 / '+Object.keys(rules).length+' rules listed'});
+ document.getElementById('syntaxExtList')?.addEventListener('click',()=>{show();status.textContent=Object.keys(rules).length+' '+syntaxT('count')});
  show();
 }
 let active=false,seq=0,timer=0,lastDoc=null;
