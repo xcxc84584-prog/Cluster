@@ -6,7 +6,7 @@ $gateway=Join-Path $base 'app\oauth-mcp-gateway.cjs'
 if(!(Test-Path -LiteralPath (Split-Path $gateway))){New-Item -ItemType Directory -Path (Split-Path $gateway) -Force | Out-Null}
 Write-Host 'Installing Cluster OAuth Gateway P3.8.4...' -ForegroundColor Cyan
 $gatewayDownload=$gateway+'.update.cjs'
-Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/c2c1913ccbb4feb14d43ecfc2a7cf548e21c9f36/agent_terminal/oauth-mcp-gateway.cjs' -OutFile $gatewayDownload
+Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/7ab75425f1092e38bf54528912677553b5cf1b89/agent_terminal/oauth-mcp-gateway.cjs' -OutFile $gatewayDownload
 
 $node=(Get-Command node.exe -ErrorAction SilentlyContinue)
 if(!$node){throw 'Node.js 20+ is required.'}
