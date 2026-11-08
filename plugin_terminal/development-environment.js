@@ -104,5 +104,16 @@ tabs.addEventListener('click',event=>{
 const observer=new MutationObserver(()=>{if(opened&&!tabs.contains(tab))ensureTab();});
 observer.observe(tabs,{childList:true});
 document.querySelector('[data-action="closeall"]')?.addEventListener('click',close);
+const toolsButton=$('developmentOpenPage');
+if(toolsButton){
+ const updateToolLabel=()=>{toolsButton.textContent=lang()==='zh'?'開發環境':'Development Environment'};
+ toolsButton.addEventListener('click',()=>{
+  document.getElementById('fileMenu')?.removeAttribute('open');
+  window.ClusterSyntaxPage?.deactivate?.();
+  open();
+ });
+ $('uiLanguage')?.addEventListener('change',updateToolLabel);
+ updateToolLabel();
+}
 window.ClusterDevelopmentEnvironment={open,close,deactivate,download};
 })();
