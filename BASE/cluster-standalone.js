@@ -155,64 +155,35 @@ async function flushV(d){clearTimeout(vTimers.get(d.id));if(d.vOperations.length
 // collapses into spaces and wraps as '1 2 3' instead of one number per row.
 // Match textarea soft wraps: each logical line occupies one or more visual rows.
 // Keep the line number on its first visual row and leave continuation rows blank.
-function visualRowCount(text,columns,tabSize=4){
- let col=0,rows=1;
- for(let i=0;i<text.length;i++){
-  const ch=text.charCodeAt(i);
-  const width=ch===9?tabSize-col%tabSize:1;
-  if(col+width>columns){rows++;col=0}
-  col+=width;
-  if(col===columns&&i<text.length-1){rows++;col=0}
- }
- return rows;
-}
-// Virtualized visual-row gutter: a wrapped logical line may occupy hundreds
-// of viewport rows. Render only visible labels, not one DOM node per line.
-let gutterFirst=1,gutterRows=[],gutterPrefix=[0],gutterHeight=23.2,gutterFrame=0;
+// One logical newline equals one gutter row. Long lines scroll horizontally.
+// This matches the original Cluster editor and avoids soft-wrap geometry drift.
+let gutterFirst=1,gutterRows=[],gutterPrefix=[0],gutterHeight=23.2;
 function syncGutterGeometry(){
  const style=getComputedStyle(editor);
- const canvas=syncGutterGeometry.canvas||(syncGutterGeometry.canvas=document.createElement('canvas'));
- const ctx=canvas.getContext('2d');ctx.font=style.font;
- const charWidth=ctx.measureText('M').width||8;
- const available=editor.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
- const cols=Math.max(1,Math.floor(available/charWidth));
- const wraps=style.whiteSpace!=='pre'&&style.whiteSpace!=='nowrap';
  gutterHeight=parseFloat(style.lineHeight)||23.2;
- const lines=editor.value.split('\\n');
- gutterRows=lines.map(line=>wraps?visualRowCount(line,cols,parseInt(style.tabSize,10)||4):1);
- gutterPrefix=[0];for(const n of gutterRows)gutterPrefix.push(gutterPrefix[gutterPrefix.length-1]+n);
- paintVisibleGutter();
+ gutter.scrollTop=editor.scrollTop;
 }
-function paintVisibleGutter(){
- if(!gutterRows.length)return;
- const top=editor.scrollTop,first=Math.max(0,Math.floor(top/gutterHeight));
- const visible=Math.ceil(editor.clientHeight/gutterHeight)+3;
- const last=Math.min(gutterPrefix[gutterPrefix.length-1],first+visible);
- let lo=0,hi=gutterRows.length;
- while(lo<hi){const mid=(lo+hi)>>1;if(gutterPrefix[mid+1]<=first)lo=mid+1;else hi=mid}
- const fragment=document.createDocumentFragment();
- const paddingTop=parseFloat(getComputedStyle(editor).paddingTop)||0;
- for(let row=first,i=lo;row<last;row++){
-  while(i+1<gutterPrefix.length&&row>=gutterPrefix[i+1])i++;
-  const span=document.createElement('span');span.className='line-number';
-  const continuation=row>gutterPrefix[i];
-  span.textContent=continuation?'↳'+(gutterFirst+i):String(gutterFirst+i);
-  span.style.cssText='position:absolute;right:10px;left:0;top:'+(paddingTop+row*gutterHeight-top)+'px;height:'+gutterHeight+'px;line-height:'+gutterHeight+'px;text-align:right;white-space:nowrap';
-  if(fm.active&&[...fm.active.blocks.values()].some(b=>gutterFirst+i>=b.start&&gutterFirst+i<=b.end))span.classList.add('cluster-block');
-  fragment.append(span);
- }
- gutter.style.position='relative';
- gutter.replaceChildren(fragment);
-}
+function paintVisibleGutter(){gutter.scrollTop=editor.scrollTop;}
 function renderGutter(first,total){
  gutterFirst=first;
+ const fragment=document.createDocumentFragment();
+ const blocks=fm.active?[...fm.active.blocks.values()]:[];
+ for(let i=0;i<Math.min(total,5000);i++){
+  const row=document.createElement('span');
+  row.className='line-number';
+  row.textContent=String(first+i);
+  if(blocks.some(b=>first+i>=b.start&&first+i<=b.end))row.classList.add('cluster-block');
+  fragment.appendChild(row);
+ }
+ gutter.style.position='';
+ gutter.replaceChildren(fragment);
  syncGutterGeometry();
 }
 function refreshSmallGutter(){
   const d=fm.active;
   if(!d||d.size>=100000)return;
   const lines=editor.value.split('\n').length;
-  renderGutter(1,lines);
+  if(gutter.childElementCount!==Math.min(lines,5000))renderGutter(1,lines);
 }
 
 function tabs(){const list=$('tabList');const terminalVisible=!document.getElementById('clusterTerminalPanel')?.hidden;list.replaceChildren();for(const d of fm.docs){const el=document.createElement('div');el.className='tab'+(d===fm.active?' is-active':'');const select=document.createElement('button');select.className='tab-select';select.textContent=d.name+(d.dirty?' ●':'');select.onclick=()=>{window.ClusterTerminal?.deactivate?.();start=1;fm.select(d.id)};const close=document.createElement('button');close.className='tab-close';close.textContent='×';close.title='關閉文件';close.onclick=()=>{if(d.dirty&&!confirm('文件尚未儲存，確定關閉？'))return;fm.close(d.id)};el.dataset.tabKey='file:'+d.id;el.append(select,close);list.append(el)}$('empty').hidden=terminalVisible||!!fm.active;$('editorShell').hidden=terminalVisible||!fm.active;$('clusterBottomBar').hidden=terminalVisible||!fm.active;$('footerName').textContent=fm.active?.name||'未命名.txt';$('tierStatus').textContent=fm.active?(fm.active.size<100000?'L0':'L1'):'L0';updateBlockDirectory();window.ClusterTerminal?.syncTabs?.();window.ClusterTabOrder?.apply?.()}
@@ -242,7 +213,7 @@ $('fileButton').onclick=()=>{if(!$('fileMenu').hidden){/* closing */}else{$('blo
 $('fileInput').onchange=async e=>{const files=Array.from(e.target.files||[]);e.target.value='';for(const f of files){try{emit('FileManager',`Opening ${f.name}`);await fm.open(f);emit('FileManager',`Opened ${f.name}; external watch unavailable (File input has no persistent handle)`)}catch(err){emit('FileManager',`ERROR OPEN ${f.name}: ${err.message}`)}}};
 // [FIX-PR8] Center target line and prefetch surrounding slice window.
 const lineHeight=()=>{const st=getComputedStyle(editor);return parseFloat(st.lineHeight)||23.2};
-const centerLine=(localLine)=>{const h=lineHeight(),visible=Math.max(1,Math.floor(editor.clientHeight/h));const visual=gutterPrefix[Math.max(0,localLine-1)]??localLine-1;editor.scrollTop=Math.max(0,(visual-(visible-1)/2)*h);paintVisibleGutter()};
+const centerLine=(localLine)=>{const h=lineHeight(),visible=Math.max(1,Math.floor(editor.clientHeight/h));const visual=localLine-1;editor.scrollTop=Math.max(0,(visual-(visible-1)/2)*h);paintVisibleGutter()};
 $('clusterGoLine').onclick=async()=>{const d=fm.active;if(!d)return;const n=Number($('clusterLine').value);if(!Number.isInteger(n)||n<1){emit('SegmentLoader','ERROR PR8:001 Invalid line');return}
  try{if(d.size<100000){const lines=editor.value.split('\n');if(n>lines.length)throw Error('Line out of range');const pos=lines.slice(0,n-1).join('\n').length+(n>1?1:0);editor.focus();editor.setSelectionRange(pos,pos);centerLine(n);return}
  if(!d.indexComplete||n>d.getViewLineCount())throw Error('Index unavailable or out of range');
@@ -273,7 +244,7 @@ editor.addEventListener('wheel',e=>{const d=fm.active;if(!d||d.size<100000||!d.i
  const nearTop=editor.scrollTop<=2;
  if((e.deltaY>0&&nearBottom)||(e.deltaY<0&&nearTop)){e.preventDefault();void shiftWindow(e.deltaY>0?1:-1)}
 },{passive:false});
-editor.addEventListener('scroll',()=>{if(gutterFrame)return;gutterFrame=requestAnimationFrame(()=>{gutterFrame=0;paintVisibleGutter()})});
+editor.addEventListener('scroll',()=>{gutter.scrollTop=editor.scrollTop});
 window.addEventListener('resize',()=>{if(!document.getElementById('editorShell')?.hidden)syncGutterGeometry()});
 const updatePos=()=>{const prefix=editor.value.slice(0,editor.selectionStart).split('\n');$('position').textContent=`Ln ${start+prefix.length-1}, Col ${prefix.at(-1).length+1}`};editor.addEventListener('click',updatePos);editor.addEventListener('keyup',updatePos);
 window.addEventListener('keydown',e=>{if(!e.ctrlKey)return;const k=e.key.toLowerCase();if(k==='n'||k==='o'||k==='s'){e.preventDefault();(k==='n'?action.new:k==='o'?action.open:e.shiftKey?action.saveas:action.save)()}});
