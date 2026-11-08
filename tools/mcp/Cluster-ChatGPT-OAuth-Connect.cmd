@@ -5,7 +5,7 @@ echo Cluster ChatGPT OAuth Connect - P3.9.3-DARK-OAUTH
 echo Requires a running Cluster MCP server. OAuth Gateway installs automatically.
 echo.
 set "PS1=%TEMP%\Cluster-ChatGPT-OAuth-%RANDOM%.ps1"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/5cd926ea49b247af6a0fff23392af64ba38e5dfa/tools/mcp/Cluster-ChatGPT-OAuth-Connect.ps1' -OutFile '%PS1%'"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/008cfd96b2d16901c2ce2e415de1ed0735e1de0e/tools/mcp/Cluster-ChatGPT-OAuth-Connect.ps1' -OutFile '%PS1%'"
 if errorlevel 1 (
  echo Download failed.
  pause
