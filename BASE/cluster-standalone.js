@@ -96,6 +96,24 @@ function queueV(d,op){d.vOperations.push({...op,id:++d.vRevision,at:Date.now()})
 async function flushV(d){clearTimeout(vTimers.get(d.id));if(d.vOperations.length)await persistV(d);if(d.vError)throw d.vError}
 
 
+// Display-only V line offset. Each original window contributes at most once:
+// b = sum(new logical line count - original logical line count) for completed
+// V windows before the displayed original line. Never change source indexing.
+function vGutterOffset(doc,originalLine){
+ if(!doc||!doc.indexComplete||!doc.vOperations?.length)return 0;
+ const latest=new Map();
+ for(const op of doc.vOperations){
+  if(op.kind!=='window'||!Number.isInteger(op.start)||!Number.isInteger(op.count)||op.count<1||typeof op.text!=='string')continue;
+  latest.set(op.start+':'+op.count,op);
+ }
+ let delta=0;
+ for(const op of latest.values()){
+  // Only completed preceding windows affect this line. An overlapping edit
+  // cannot be reliably counted twice, so leave the underlying logic untouched.
+  if(op.start+op.count<=originalLine)delta+=op.text.split('\\n').length-op.count;
+ }
+ return delta;
+}
 // [FIX-001] Gutter uses one non-wrapping DOM row per physical line.
 // The old CSS sets #gutter{white-space:normal}; textContent with newline characters
 // collapses into spaces and wraps as '1 2 3' instead of one number per row.
@@ -104,7 +122,7 @@ function renderGutter(first,total){
   for(let i=0;i<Math.min(total,5000);i++){
     const row=document.createElement('span');
     row.className='line-number';
-    row.textContent=String(first+i);
+    row.textContent=String(first+i+vGutterOffset(fm.active,first+i));
     if(fm.active && [...fm.active.blocks.values()].some(b=>first+i>=b.start&&first+i<=b.end))row.classList.add('cluster-block');
     fragment.appendChild(row);
   }
