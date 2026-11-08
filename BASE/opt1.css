@@ -20,3 +20,8 @@
 .cluster-rename{font-size:11px;background:#1b2d42;color:#d7e6f7;border:1px solid #435977;border-radius:5px;padding:4px 6px}
 #cexpTree .cexp-node[draggable=true]{cursor:grab}
 #cexpTree .cexp-node.cexp-drop{outline:1px dashed #76b6ef}
+
+/* PR: restore logical-line rendering (no soft wrap), synchronize gutter row height. */
+#editor{white-space:pre!important;overflow-wrap:normal!important;word-break:normal!important;overflow-x:auto!important}
+#gutter .line-number{display:block!important;height:23.2px!important;min-height:23.2px!important;line-height:23.2px!important}
+@media(max-width:550px){#gutter .line-number{height:20px!important;min-height:20px!important;line-height:20px!important}}
