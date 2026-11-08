@@ -11,14 +11,14 @@ const code=document.createElement('pre');
 code.id='clusterSyntaxCode';
 overlay.append(code);shell.insertBefore(overlay,editor);
 const languages={c:'c',h:'c',cc:'cpp',cpp:'cpp',cxx:'cpp',hpp:'cpp',hxx:'cpp',py:'python',js:'javascript',mjs:'javascript',cjs:'javascript',ts:'typescript',tsx:'tsx',jsx:'jsx',html:'markup',htm:'markup',xml:'markup',css:'css',json:'json',md:'markdown',ps1:'powershell',java:'java',rs:'rust',go:'go',sh:'bash',sql:'sql'};
-let active=false,seq=0,timer=0,lastSignature='',lastDoc=null;
+let active=false,seq=0,timer=0,lastDoc=null;
 const getLanguage=d=>{const name=d?.name||'';const ext=name.split('.').pop().toLowerCase();return languages[ext]||'none'};
 function align(){
  const s=getComputedStyle(editor);
  overlay.style.left=editor.offsetLeft+'px';overlay.style.top=editor.offsetTop+'px';
  overlay.style.width=editor.offsetWidth+'px';overlay.style.height=editor.offsetHeight+'px';
- code.style.font=s.font;code.style.lineHeight=s.lineHeight;code.style.letterSpacing=s.letterSpacing;
- code.style.padding=s.padding;code.style.tabSize=s.tabSize;
+ code.style.margin='0';code.style.border='0';code.style.color='#e6e6e6';code.style.font=s.font;code.style.lineHeight=s.lineHeight;code.style.letterSpacing=s.letterSpacing;
+ code.style.padding=s.padding;code.style.minHeight='100%';code.style.tabSize=s.tabSize;
  code.style.whiteSpace=s.whiteSpace;code.style.overflowWrap=s.overflowWrap;
  code.style.width=editor.clientWidth+'px';code.style.boxSizing='border-box';
  code.style.transform='translate('+-editor.scrollLeft+'px,'+-editor.scrollTop+'px)';
@@ -29,7 +29,7 @@ function appendToken(out,token,classes,skip){
   const end=skip.pos+token.length;
   if(end>skip.start){
    const part=token.slice(Math.max(0,skip.start-skip.pos));
-   if(classes.length){const span=document.createElement('span');span.className=classes.map(x=>'token '+x).join(' ');span.append(escapeText(part));out.append(span)}
+   if(classes.length){const span=document.createElement('span');span.className='token '+classes.join(' ');span.append(escapeText(part));out.append(span)}
    else out.append(escapeText(part));
   }
   skip.pos=end;return;
@@ -39,7 +39,7 @@ function appendToken(out,token,classes,skip){
  if(Array.isArray(value))for(const t of value)appendToken(out,t,types,skip);
  else appendToken(out,value,types,skip);
 }
-function showPlain(text){code.textContent=text;overlay.classList.remove('syntax-active');editor.classList.remove('syntax-transparent');active=false}
+function showPlain(text){code.textContent=text;shell.classList.remove('syntax-enabled');active=false}
 async function refresh(){
  const id=++seq,d=window.cluster?.fm?.active;
  const text=editor.value||'';
@@ -52,7 +52,7 @@ async function refresh(){
  // It is deliberately bounded: an unterminated construct spanning more than
  // the lookback may be colored provisionally rather than scanning 1 GiB.
  let prefix='';
- const start=window.clusterSyntaxViewportStart?.()||1;
+ const start=window.ClusterSyntaxViewport?.start?.()||1;
  if(start>1&&d.indexComplete&&typeof d.getLines==='function'){
   try{
    const from=Math.max(1,start-256),n=start-from;
@@ -69,7 +69,7 @@ async function refresh(){
   const fragment=document.createDocumentFragment(),skip={start:prefix.length,pos:0};
   for(const t of tokens)appendToken(fragment,t,[],skip);
   code.replaceChildren(fragment);
-  overlay.classList.add('syntax-active');editor.classList.add('syntax-transparent');active=true;
+  shell.classList.add('syntax-enabled');active=true;
   align();
  }catch(e){showPlain(text);console.warn('Cluster syntax fallback:',e)}
 }
@@ -85,7 +85,7 @@ const check=()=>{
  const d=window.cluster?.fm?.active;
  if(d!==lastDoc){lastDoc=d;schedule()}
 };
-window.clusterSyntax={refresh:schedule,dispose(){clearTimeout(timer);++seq;overlay.remove();editor.classList.remove('syntax-transparent')}};
+window.clusterSyntax={refresh:schedule,dispose(){clearTimeout(timer);++seq;overlay.remove();shell.classList.remove('syntax-enabled')}};
 window.addEventListener('focus',check);
 document.addEventListener('click',check,true);
 align();schedule();
