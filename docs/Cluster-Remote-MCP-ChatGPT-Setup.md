@@ -163,3 +163,9 @@ P3.7.1 的一鍵腳本已提交 GitHub，但尚未在使用者 Windows 環境執
 5. 若仍失敗，開 Chrome DevTools Console，回報不含授權碼、state、token、密碼的錯誤。
 
 此修正已提交但尚未通過使用者 Windows 實測。
+
+## 13. P3.8.2：OAuth Gateway 43881 衝突時確認強制關閉
+
+新版 ChatGPT OAuth Connect CMD（`P3.8.2-PORT-CONFIRM`）發現 43881 已被占用時，會顯示 PID、程序名稱及命令列，且**只有辨識為 node.exe 執行 oauth-mcp-gateway.cjs 的既有 Cluster Gateway**，才詢問 `Stop this existing Cluster OAuth Gateway and continue? (Y/N)`。輸入 Y 才會再次確認 PID、程序建立時間、命令列與埠號後停止舊程序，等待 43881 釋放再繼續；N 或其他輸入不會停止任何程序。非 Cluster 程序或多程序衝突一律拒絕自動關閉。43880 本地 MCP 不受影響。
+
+**操作提醒：** 停止舊 Gateway 會中斷既有 OAuth 授權與工作階段；新的 Cloudflare Quick Tunnel URL 可能不同，必須更新 ChatGPT 連接器。此版本已提交 GitHub，仍待 Windows 實測。
