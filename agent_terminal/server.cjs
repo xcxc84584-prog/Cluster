@@ -32,10 +32,10 @@ const wss=new WebSocketServer({noServer:true,maxPayload:MAX_MESSAGE});
 function isLoopback(addr){return addr==='127.0.0.1'||addr==='::1'||addr==='::ffff:127.0.0.1';}
 server.on('upgrade',(req,socket,head)=>{
  const origin=req.headers.origin;
- if(!isLoopback(req.socket.remoteAddress)||origin!==allowedOrigin||req.url!=='/terminal'){
+ if(!isLoopback(req.socket.remoteAddress)||origin!==allowedOrigin||!['/terminal','/agent'].includes(req.url)){
   socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');socket.destroy();return;
  }
- wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws,req));
+ wss.handleUpgrade(req,socket,head,ws=>{ws.clusterAgentMode=req.url==='/agent';wss.emit('connection',ws,req)});
 });
 function send(ws,obj){if(ws.readyState===1)ws.send(JSON.stringify(obj));}
 function validRoot(value,expected){
@@ -51,6 +51,11 @@ wss.on('connection',ws=>{
  ws.on('message',raw=>{
   let m;try{m=JSON.parse(raw.toString());if(!m||typeof m.type!=='string')throw Error('Invalid message');
    if(!authorized){if(m.type!=='auth'||typeof m.token!=='string'||m.token.length!==token.length||!crypto.timingSafeEqual(Buffer.from(m.token),Buffer.from(token)))throw Error('Authentication failed');authorized=true;clearTimeout(timeout);send(ws,{type:'ready',maxSessions:MAX_SESSIONS});return;}
+   if(ws.clusterAgentMode){
+    if(m.type==='ping'){send(ws,{type:'pong',requestId:m.requestId,at:Date.now()});return;}
+    if(m.type==='task'){const requestId=typeof m.requestId==='string'?m.requestId:'';if(!requestId||typeof m.prompt!=='string'||!m.prompt.trim()||m.prompt.length>8000)throw Error('Invalid task');send(ws,{type:'task_status',requestId,status:'failed',message:'AI provider is not configured. Connection test succeeded; model execution is not yet available.'});return;}
+    throw Error('Unsupported AI Agent operation');
+   }
    if(m.type==='revoke'){
     token=crypto.randomBytes(32).toString('hex');
     fs.writeFileSync(tokenFile,token+'\n',{mode:0o600});
