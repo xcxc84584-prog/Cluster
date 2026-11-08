@@ -45,3 +45,25 @@
 - 現有 MCP Server 使用靜態 Bearer Token，不能直接替代 OAuth。
 - Cloudflare Quick Tunnel 沒有穩定性保證，重新啟動後 URL 可能改變。
 - `cluster.list_files` 僅列出編輯器已開啟的檔案；`cluster.read_file` 目前僅支援符合限制的已儲存檔案。
+
+
+## 6. P3.7 OAuth Gateway 原型（已提交，未部署驗證）
+
+新增 agent_terminal/oauth-mcp-gateway.cjs：Node.js 20+，監聽 127.0.0.1:43881，提供 OAuth 授權碼 + PKCE S256、動態註冊、授權與受保護資源中繼資料、授權同意頁、短期 Access Token，並以內部 Bearer Token 轉發到 43880。
+
+### 待使用者執行的部署步驟
+
+1. 準備自己的穩定 HTTPS 網域與 Cloudflare Named Tunnel；臨時 trycloudflare URL 不適合當持久 OAuth issuer。
+2. 將 oauth-mcp-gateway.cjs 安裝到本機 ClusterTerminalAgent/app，保留既有 43879 與 43880 服務。
+3. 在 PowerShell 設定環境變數 CLUSTER_OAUTH_ISSUER 為完整 HTTPS origin（不含 /mcp），執行 node oauth-mcp-gateway.cjs。
+4. Named Tunnel 僅轉發到 127.0.0.1:43881，不可公開 43879 或取消 43880 的驗證。
+5. 本機授權密碼存於 %LOCALAPPDATA%/ClusterTerminalAgent/oauth-approval-password；只在授權頁輸入，絕不貼到聊天。
+6. 驗證 OAuth metadata、register、authorize、token、/mcp，然後在 ChatGPT 自訂 MCP 連接器選 OAuth，填入固定域名的 /mcp URL。
+
+### 尚未完成
+
+- 本原型尚未在使用者 Windows 電腦實測，也未完成 ChatGPT 端到端授權。
+- 尚未製作一鍵安裝與 Named Tunnel 設定。
+- 用戶端與 Token 存在記憶體，服務重啟後需要重新註冊／授權。
+- 正式公開前仍需加強全域速率限制、稽核與安全測試。
+- 現有工具僅提供唯讀操作，尚未提供寫入或 PowerShell 權限。
