@@ -1,0 +1,25 @@
+/* Prism presentation layer. Textarea remains the only editor and scroll owner. */
+#editorShell{position:relative}
+#clusterSyntaxOverlay{
+ position:absolute;z-index:1;margin:0;border:0;pointer-events:none;
+ background:transparent;color:#e6e6e6;overflow:hidden;
+ white-space:pre;overflow-wrap:normal;word-break:normal;
+ font-variant-ligatures:none;user-select:none;
+}
+#editorShell.syntax-enabled #editor{
+ position:relative;z-index:2;color:transparent!important;
+ -webkit-text-fill-color:transparent;
+ background:transparent!important;caret-color:#fff!important;
+}
+#editorShell.syntax-enabled #editor::selection{
+ background:rgba(80,130,220,.40);
+ -webkit-text-fill-color:transparent;
+}
+#clusterSyntaxOverlay .token.comment,#clusterSyntaxOverlay .token.prolog{color:#6b8c73}
+#clusterSyntaxOverlay .token.keyword,#clusterSyntaxOverlay .token.atrule{color:#c792ea}
+#clusterSyntaxOverlay .token.string,#clusterSyntaxOverlay .token.char{color:#c3e88d}
+#clusterSyntaxOverlay .token.number,#clusterSyntaxOverlay .token.boolean{color:#f78c6c}
+#clusterSyntaxOverlay .token.function,#clusterSyntaxOverlay .token.class-name{color:#82aaff}
+#clusterSyntaxOverlay .token.operator,#clusterSyntaxOverlay .token.punctuation{color:#d6dae1}
+#clusterSyntaxOverlay .token.property,#clusterSyntaxOverlay .token.tag{color:#f07178}
+#clusterSyntaxOverlay .token.selector,#clusterSyntaxOverlay .token.attr-name{color:#ffcb6b}
