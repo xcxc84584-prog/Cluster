@@ -30,7 +30,16 @@ function readProvider(){try{const p=JSON.parse(fs.readFileSync(providerFile,'utf
 function saveProvider(p){fs.writeFileSync(providerFile,JSON.stringify(p),{mode:0o600});}
 const MAX_SESSIONS=8,MAX_MESSAGE=65536;
 const roots=new Map();const sessions=new Map();
-const server=http.createServer((req,res)=>{res.writeHead(404,{'Content-Type':'text/plain','Cache-Control':'no-store'});res.end('Not Found');});
+const gatewayStarted=Date.now();
+const gatewayTasks=new Map();
+function gatewayResponse(res,status,data){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));}
+const server=http.createServer((req,res)=>{
+ const route=(req.url||'').split('?')[0];
+ if(req.method!=='GET'||!['/mcp/status','/mcp/tasks'].includes(route)){gatewayResponse(res,404,{error:'Not Found'});return;}
+ if(!isLoopback(req.socket.remoteAddress)||typeof req.headers.authorization!=='string'||req.headers.authorization.length!==7+token.length||!crypto.timingSafeEqual(Buffer.from(req.headers.authorization),Buffer.from('Bearer '+token))){gatewayResponse(res,403,{error:'Forbidden'});return;}
+ if(route==='/mcp/status')gatewayResponse(res,200,{connected:true,service:'Cluster Local Gateway',version:'p3-readonly',uptimeMs:Date.now()-gatewayStarted,activeTerminalSessions:sessions.size,capabilities:['cluster.get_status','cluster.get_task_status'],browserEditorConnected:false});
+ else gatewayResponse(res,200,{tasks:[...gatewayTasks.values()].slice(-50)});
+});
 const wss=new WebSocketServer({noServer:true,maxPayload:MAX_MESSAGE});
 function isLoopback(addr){return addr==='127.0.0.1'||addr==='::1'||addr==='::ffff:127.0.0.1';}
 server.on('upgrade',(req,socket,head)=>{
@@ -72,7 +81,7 @@ wss.on('connection',ws=>{
      const provider=readProvider();
      if(!provider.apiKey){send(ws,{type:'task_status',requestId,status:'failed',message:'Configure an OpenAI API key first.'});return;}
      const controller=new AbortController();aiTask={requestId,controller};
-     send(ws,{type:'task_status',requestId,status:'running',message:'Requesting model response'});
+     gatewayTasks.set(requestId,{requestId,status:'running',updatedAt:Date.now()});send(ws,{type:'task_status',requestId,status:'running',message:'Requesting model response'});
      const timer=setTimeout(()=>controller.abort(),90000);
      (async()=>{
       try{
@@ -83,7 +92,7 @@ wss.on('connection',ws=>{
        const answer=data.choices?.[0]?.message?.content;
        if(typeof answer!=='string')throw Error('No text response from model');
        send(ws,{type:'task_result',requestId,text:answer});
-       send(ws,{type:'task_status',requestId,status:'completed',message:'Completed'});
+       gatewayTasks.set(requestId,{requestId,status:'completed',updatedAt:Date.now()});send(ws,{type:'task_status',requestId,status:'completed',message:'Completed'});
       }catch(e){if(aiTask?.requestId===requestId)send(ws,{type:'task_status',requestId,status:e.name==='AbortError'?'interrupted':'failed',message:e.name==='AbortError'?'Request timed out':e.message});}
       finally{clearTimeout(timer);if(aiTask?.requestId===requestId)aiTask=null;}
      })();return;
