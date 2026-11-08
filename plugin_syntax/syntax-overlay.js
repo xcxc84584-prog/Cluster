@@ -10,9 +10,9 @@ overlay.setAttribute('aria-hidden','true');
 const code=document.createElement('pre');
 code.id='clusterSyntaxCode';
 overlay.append(code);shell.insertBefore(overlay,editor);
-const languages={c:'c',h:'c',cc:'cpp',cpp:'cpp',cxx:'cpp',hpp:'cpp',hxx:'cpp',py:'python',js:'javascript',mjs:'javascript',cjs:'javascript',ts:'typescript',tsx:'tsx',jsx:'jsx',html:'markup',htm:'markup',xml:'markup',css:'css',json:'json',md:'markdown',ps1:'powershell',java:'java',rs:'rust',go:'go',sh:'bash',sql:'sql'};
+const languages={c:'c',h:'c',ino:'cpp',bak:'cpp',cc:'cpp',cpp:'cpp',cxx:'cpp',hpp:'cpp',hxx:'cpp',py:'python',js:'javascript',mjs:'javascript',cjs:'javascript',ts:'typescript',tsx:'tsx',jsx:'jsx',html:'markup',htm:'markup',xml:'markup',css:'css',json:'json',md:'markdown',ps1:'powershell',java:'java',rs:'rust',go:'go',sh:'bash',sql:'sql'};
 let active=false,seq=0,timer=0,lastDoc=null;
-const getLanguage=d=>{const name=d?.name||'';const ext=name.split('.').pop().toLowerCase();return languages[ext]||'none'};
+const getLanguage=d=>{const name=d?.name||'';const ext=name.split('.').pop().toLowerCase();if(ext==='bak'){const previous=name.slice(0,-4).split('.').pop().toLowerCase();return languages[previous]||'cpp'}return languages[ext]||'none'};
 function align(){
  const s=getComputedStyle(editor);
  overlay.style.left=editor.offsetLeft+'px';overlay.style.top=editor.offsetTop+'px';
