@@ -106,3 +106,12 @@ P3.7.1 的一鍵腳本已提交 GitHub，但尚未在使用者 Windows 環境執
 ## 8. Windows cloudflared 路徑修復（2026-11-08）
 
 舊版 Cluster-MCP-OneClick.cmd 曾固定下載舊版 PowerShell 腳本，即使主分支的 cloudflared 搜尋已修正，仍可能顯示 executable not found。新版 CMD 標題應顯示 `v20261108-pathfix-2`，已固定下載含 `C:\Program Files (x86)\cloudflared\cloudflared.exe` 的新版腳本。新版避免遞迴掃描整個 Program Files / AppData。若仍失敗，請執行 `where.exe cloudflared`，確認路徑並回報；不必重新安裝 cloudflared。
+
+
+## 9. P3.7.2：自動輸出完整 MCP URL 與 OAuth Node.js 修正
+
+- Cluster-MCP-OneClick.cmd 版本 `v20261108-url-output-4`：從 cloudflared 真實日誌擷取 `https://<隧道>.trycloudflare.com`，在畫面顯示完整 `https://<隧道>.trycloudflare.com/mcp`。此網址目前仍指向 43880 Bearer MCP，不是 OAuth 43881。
+- 新版 MCP 腳本保留隧道視窗，關閉視窗或 Ctrl+C 即停止連線；請勿將 Token 或本機授權密碼公開。
+- Cluster-OAuth-Local-Test.ps1 修復 Node.js v24 無法檢查 `.download` 副檔名的問題，改為 `.download.cjs` 後再檢查語法。
+- **使用者已實測：** v20261108-syntaxfix-3 自動找到 cloudflared，成功建立 Quick Tunnel；OAuth 舊版測試因副檔名錯誤失敗。
+- **尚待使用者實測：** v20261108-url-output-4 是否正確顯示 MCP URL；修正版 OAuth 測試是否全部 PASS。
