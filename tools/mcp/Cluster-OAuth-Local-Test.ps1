@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-Write-Host 'Cluster OAuth Local Setup + Safety Check (P3.7.1)' -ForegroundColor Cyan
+Write-Host 'Cluster OAuth Local Setup + Safety Check (P3.7.3)' -ForegroundColor Cyan
 Write-Host 'This is a LOCAL test only. It does not publish an OAuth endpoint or change the existing MCP tunnel.' -ForegroundColor Yellow
 $base = Join-Path $env:LOCALAPPDATA 'ClusterTerminalAgent'
 $app = Join-Path $base 'app'
@@ -14,8 +14,8 @@ $source = 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/main/agent_t
 Write-Host 'Downloading OAuth gateway source from Cluster GitHub...' -ForegroundColor Cyan
 Invoke-WebRequest -Uri $source -OutFile ($target+'.download.cjs') -UseBasicParsing
 & $node.Source --check ($target+'.download.cjs')
-if ($LASTEXITCODE -ne 0) { Remove-Item ($target+'.download') -Force; throw 'Gateway syntax check failed.' }
-Move-Item -Path ($target+'.download') -Destination $target -Force
+if ($LASTEXITCODE -ne 0) { Remove-Item ($target+'.download.cjs') -Force; throw 'Gateway syntax check failed.' }
+Move-Item -Path ($target+'.download.cjs') -Destination $target -Force
 Write-Host ('Installed: '+$target) -ForegroundColor Green
 $port = 43881
 if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) { throw 'Port 43881 is occupied. Close the existing OAuth gateway before local test.' }
