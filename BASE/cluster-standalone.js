@@ -99,20 +99,43 @@ async function flushV(d){clearTimeout(vTimers.get(d.id));if(d.vOperations.length
 // Display-only V line offset. Each original window contributes at most once:
 // b = sum(new logical line count - original logical line count) for completed
 // V windows before the displayed original line. Never change source indexing.
-function vGutterOffset(doc,originalLine){
- if(!doc||!doc.indexComplete||!doc.vOperations?.length)return 0;
+// Line-coordinate mapping for V windows. Only count changed content, not
+// the entire 160-line viewport. Overlapping edited ranges are unsafe to sum.
+function vLineMap(doc){
  const latest=new Map();
- for(const op of doc.vOperations){
-  if(op.kind!=='window'||!Number.isInteger(op.start)||!Number.isInteger(op.count)||op.count<1||typeof op.text!=='string')continue;
-  latest.set(op.start+':'+op.count,op);
+ for(const op of doc?.vOperations||[]){
+  if(op.kind==='window'&&Number.isInteger(op.start)&&Number.isInteger(op.count)&&op.count>0&&typeof op.text==='string')
+   latest.set(op.start+':'+op.count,op);
  }
+ const windows=[...latest.values()].sort((a,b)=>a.start-b.start);
+ const entries=[];let previousEnd=0,offset=0,conflict=false;
+ for(const op of windows){
+  const originalCount=Math.min(op.count,Math.max(0,doc.lineStarts.length-op.start+1));
+  if(!originalCount)continue;
+  const end=op.start+originalCount-1;
+  if(op.start<=previousEnd){conflict=true;continue}
+  // An untouched window must not contribute an artificial -1 or +1.
+  const newCount=op.text.split('\n').length;
+  const delta=newCount-originalCount;
+  entries.push({start:op.start,end,delta,before:offset,after:offset+delta,newCount});
+  offset+=delta;previousEnd=end;
+ }
+ return {entries,conflict,total:doc.lineStarts.length+offset};
+}
+function vDisplayLine(map,baseLine){
  let delta=0;
- for(const op of latest.values()){
-  // Only completed preceding windows affect this line. An overlapping edit
-  // cannot be reliably counted twice, so leave the underlying logic untouched.
-  if(op.start+op.count<=originalLine)delta+=op.text.split('\\n').length-op.count;
+ for(const e of map.entries){if(baseLine>e.end)delta=e.after;else break}
+ return baseLine+delta;
+}
+function vBaseLine(map,displayLine){
+ let delta=0;
+ for(const e of map.entries){
+  const begin=e.start+e.before,finish=begin+e.newCount-1;
+  if(displayLine<begin)break;
+  if(displayLine<=finish)return Math.max(e.start,Math.min(e.end,e.start+displayLine-begin));
+  delta=e.after;
  }
- return delta;
+ return displayLine-delta;
 }
 // [FIX-001] Gutter uses one non-wrapping DOM row per physical line.
 // The old CSS sets #gutter{white-space:normal}; textContent with newline characters
@@ -122,7 +145,7 @@ function renderGutter(first,total){
   for(let i=0;i<Math.min(total,5000);i++){
     const row=document.createElement('span');
     row.className='line-number';
-    row.textContent=String(first+i+vGutterOffset(fm.active,first+i));
+    row.textContent=String(vDisplayLine(vLineMap(fm.active),first+i));
     if(fm.active && [...fm.active.blocks.values()].some(b=>first+i>=b.start&&first+i<=b.end))row.classList.add('cluster-block');
     fragment.appendChild(row);
   }
@@ -155,7 +178,7 @@ fm.onChange(()=>{tabs();if(document.activeElement!==editor||shownDoc!==fm.active
 })();
 
 function setLoad(msg){$('clusterLoad').hidden=false;$('loadLabel').textContent=msg;$('loadPercent').textContent='';$('loadDetail').textContent=''}
-async function render(){const d=fm.active,t=++token;if(!d)return;shownDoc=d;editor.disabled=!d.indexComplete&&d.size>=100000;try{if(d.size<100000){editor.value=d.vOperations.length?([ ...d.vOperations ].reverse().find(x=>x.kind==='small')?.text??await d.getAllSmall()):d.mutations.length?d.mutations.at(-1).text:await d.getAllSmall();if(t!==token)return;start=1;const n=editor.value.split('\n').length;lastSmallText=editor.value;renderGutter(1,n);$('clusterLoad').hidden=true;return}if(!d.indexComplete){editor.disabled=true;editor.value='正在建立行號索引…';gutter.textContent='';setLoad('Indexing');if(!d.indexPromise)d.indexPromise=d.index(p=>{if(fm.active===d){$('loadLabel').textContent='Indexing';$('loadPercent').textContent=(p*100).toFixed(1)+'%'}}).then(()=>{if(fm.active===d)void render()}).catch(e=>emit('SegmentLoader','ERROR PR6:001 '+e.message)).finally(()=>{d.indexPromise=null});return}const lines=await d.getLines(start,count);if(t!==token)return;editor.value=d.pendingView&&d.pendingView.start===start?d.pendingView.text:lines.join('\n');renderGutter(start,lines.length);setLoad(`Visible ${start}–${start+lines.length-1}`)}catch(e){emit('SegmentLoader','ERROR PR6:001 '+e.message)}}
+async function render(){const d=fm.active,t=++token;if(!d)return;shownDoc=d;editor.disabled=!d.indexComplete&&d.size>=100000;try{if(d.size<100000){editor.value=d.vOperations.length?([ ...d.vOperations ].reverse().find(x=>x.kind==='small')?.text??await d.getAllSmall()):d.mutations.length?d.mutations.at(-1).text:await d.getAllSmall();if(t!==token)return;start=1;const n=editor.value.split('\n').length;lastSmallText=editor.value;renderGutter(1,n);$('clusterLoad').hidden=true;return}if(!d.indexComplete){editor.disabled=true;editor.value='正在建立行號索引…';gutter.textContent='';setLoad('Indexing');if(!d.indexPromise)d.indexPromise=d.index(p=>{if(fm.active===d){$('loadLabel').textContent='Indexing';$('loadPercent').textContent=(p*100).toFixed(1)+'%'}}).then(()=>{if(fm.active===d)void render()}).catch(e=>emit('SegmentLoader','ERROR PR6:001 '+e.message)).finally(()=>{d.indexPromise=null});return}const lines=await d.getLines(start,count);if(t!==token)return;editor.value=d.pendingView&&d.pendingView.start===start?d.pendingView.text:lines.join('\n');renderGutter(start,editor.value.split('\n').length);setLoad(`Visible ${start}–${start+lines.length-1}`)}catch(e){emit('SegmentLoader','ERROR PR6:001 '+e.message)}}
 const action={new:()=>fm.create(),open:async()=>{try{if(window.showOpenFilePicker && window.isSecureContext){try{const handles=await window.showOpenFilePicker({multiple:true});for(const handle of handles){const file=await handle.getFile();await fm.open(file,handle);emit('FileManager',`External watch active: ${file.name}`)}await pollExternal();return}catch(err){if(err.name==='AbortError')return;emit('FileManager',`Native picker fallback: ${err.message}`)}}const picker=$('fileInput');if(!picker)throw Error('fileInput missing');picker.value='';picker.click();emit('FileManager','Open file picker requested')}catch(e){emit('FileManager','ERROR OPEN: '+e.message)}},save:()=>save(false),saveas:()=>save(true),saveall:async()=>{for(const d of fm.docs)await save(false,d)},closeall:()=>{if(fm.docs.some(d=>d.dirty)&&!confirm('有未儲存文件，確定全部關閉？'))return;for(const d of [...fm.docs])fm.close(d.id);window.ClusterTerminal?.closeAll?.()}};
 async function save(as=false,doc=fm.active){if(!doc)return;try{if(doc.pendingView){await doc.replaceLines(doc.pendingView.start,doc.pendingView.end,doc.pendingView.text);doc.pendingView=null}await flushV(doc);editor.disabled=true;try{await fm.save(doc,as)}finally{editor.disabled=false}tabs()}catch(e){emit('FileManager','ERROR '+e.message)}}
 $('fileButton').onclick=()=>{if(!$('fileMenu').hidden){/* closing */}else{$('blockDirectory').hidden=true;$('blockDirectoryButton').setAttribute('aria-expanded','false')} $('fileMenu').hidden=!$('fileMenu').hidden;$('fileButton').setAttribute('aria-expanded',String(!$('fileMenu').hidden))};$('fileMenu').addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;$('fileMenu').hidden=true;action[b.dataset.action]?.()});document.addEventListener('pointerdown',e=>{if(!e.target.closest('.menu-wrap'))$('fileMenu').hidden=true});
@@ -165,11 +188,11 @@ const lineHeight=()=>{const st=getComputedStyle(editor);return parseFloat(st.lin
 const centerLine=(localLine)=>{const h=lineHeight(),visible=Math.max(1,Math.floor(editor.clientHeight/h));editor.scrollTop=Math.max(0,(localLine-1-(visible-1)/2)*h);gutter.scrollTop=editor.scrollTop};
 $('clusterGoLine').onclick=async()=>{const d=fm.active;if(!d)return;const n=Number($('clusterLine').value);if(!Number.isInteger(n)||n<1){emit('SegmentLoader','ERROR PR8:001 Invalid line');return}
  try{if(d.size<100000){const lines=editor.value.split('\n');if(n>lines.length)throw Error('Line out of range');const pos=lines.slice(0,n-1).join('\n').length+(n>1?1:0);editor.focus();editor.setSelectionRange(pos,pos);centerLine(n);return}
- if(!d.indexComplete||n>d.lineStarts.length)throw Error('Index unavailable or out of range');
- const visible=Math.max(5,Math.ceil(editor.clientHeight/lineHeight()));const before=Math.max(visible,Math.floor(count/3));await flushV(d);start=Math.max(1,n-before);await render();
- const local=n-start+1;const lines=editor.value.split('\n');const pos=lines.slice(0,local-1).join('\n').length+(local>1?1:0);editor.focus();editor.setSelectionRange(pos,pos);centerLine(local);
+ const map=vLineMap(d);if(!d.indexComplete||n>map.total)throw Error('Index unavailable or out of range');if(map.conflict)throw Error('V 編輯視窗重疊，無法安全定位；請先處理重疊 V 紀錄');const baseN=vBaseLine(map,n);
+ const visible=Math.max(5,Math.ceil(editor.clientHeight/lineHeight()));const before=Math.max(visible,Math.floor(count/3));await flushV(d);start=Math.max(1,baseN-before);await render();
+ const local=baseN-start+1;const lines=editor.value.split('\n');const pos=lines.slice(0,local-1).join('\n').length+(local>1?1:0);editor.focus();editor.setSelectionRange(pos,pos);centerLine(local);
  // Preload adjacent byte slices in background without changing the viewport.
- const offset=d.lineStarts[n-1]||0;const slice=Math.floor(offset/(250*1024));Promise.all([slice-1,slice,slice+1].filter(i=>i>=0&&i<d.nodes.length).map(i=>d.getSlice(i))).catch(e=>emit('SegmentLoader',`PREFETCH ERROR ${e.message}`));
+ const offset=d.lineStarts[baseN-1]||0;const slice=Math.floor(offset/(250*1024));Promise.all([slice-1,slice,slice+1].filter(i=>i>=0&&i<d.nodes.length).map(i=>d.getSlice(i))).catch(e=>emit('SegmentLoader',`PREFETCH ERROR ${e.message}`));
  emit('SegmentLoader',`Goto line ${n}, viewport center, adjacent slices prefetched`);
  }catch(e){emit('SegmentLoader','ERROR PR8:001 '+e.message)}
 };
@@ -194,7 +217,7 @@ editor.addEventListener('wheel',e=>{const d=fm.active;if(!d||d.size<100000||!d.i
  if((e.deltaY>0&&nearBottom)||(e.deltaY<0&&nearTop)){e.preventDefault();void shiftWindow(e.deltaY>0?1:-1)}
 },{passive:false});
 editor.addEventListener('scroll',()=>{gutter.scrollTop=editor.scrollTop;gutter.scrollLeft=editor.scrollLeft});
-const updatePos=()=>{const prefix=editor.value.slice(0,editor.selectionStart).split('\n');$('position').textContent=`Ln ${start+prefix.length-1}, Col ${prefix.at(-1).length+1}`};editor.addEventListener('click',updatePos);editor.addEventListener('keyup',updatePos);
+const updatePos=()=>{const prefix=editor.value.slice(0,editor.selectionStart).split('\n');$('position').textContent=`Ln ${vDisplayLine(vLineMap(fm.active),start+prefix.length-1)}, Col ${prefix.at(-1).length+1}`};editor.addEventListener('click',updatePos);editor.addEventListener('keyup',updatePos);
 window.addEventListener('keydown',e=>{if(!e.ctrlKey)return;const k=e.key.toLowerCase();if(k==='n'||k==='o'||k==='s'){e.preventDefault();(k==='n'?action.new:k==='o'?action.open:e.shiftKey?action.saveas:action.save)()}});
 $('autoSyncToggle').disabled=false;$('autoSyncToggle').title='自動保存（需文件寫入權限）';
 const shell=document.createElement('button');shell.type='button';shell.textContent='PowerShell';shell.className='opt1-shell-link';shell.style.cssText='font-size:12px;color:#cddcff;background:transparent;cursor:pointer;border:1px solid #4a5262;border-radius:6px;padding:6px 10px';shell.onclick=()=>window.ClusterTerminal?.open();$('cexpToggle').after(shell);
