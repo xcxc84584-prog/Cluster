@@ -17,7 +17,7 @@ class SegmentDocument {
  async textRange(start,end){start=Math.max(0,start);end=Math.min(this.size,end);if(end<=start)return '';return decoder.decode(await this.file.slice(start,end).arrayBuffer())}
  async index(onProgress=()=>{}){if(this.indexing)return;this.indexing=true;let offset=0,carryCR=false;const block=1024*1024;try{while(offset<this.size){const end=Math.min(this.size,offset+block);const bytes=new Uint8Array(await this.file.slice(offset,end).arrayBuffer());for(let i=0;i<bytes.length;i++){if(bytes[i]===10)this.lineStarts.push(offset+i+1)}offset=end;this.indexedBytes=offset;this.indexedLines=this.lineStarts.length;onProgress(offset/Math.max(1,this.size));if(offset%(8*block)===0)await new Promise(r=>setTimeout(r,0))}this.indexComplete=true;this.emit('SegmentLoader',`Index complete,lines:${this.lineStarts.length}`)}catch(e){this.emit('SegmentLoader',`ERROR PR6:001 ${e.message}`);throw e}finally{this.indexing=false}}
  async getLines(first,count){if(this.vOperations.length){const overlay=[...this.vOperations].reverse().find(x=>x.kind==='window'&&x.start===first&&x.count===count);if(overlay)return overlay.text.split('\n')} if(!this.indexComplete&&first>this.indexedLines)throw Error('行號索引尚未完成');const start=this.lineStarts[Math.max(0,first-1)]??this.size;/* [FIX-PR1-001] End of requested line window is EOF when no subsequent newline exists. */const nextLineIndex=first+count-1;const end=nextLineIndex<this.lineStarts.length?this.lineStarts[nextLineIndex]:this.size;let text=await this.textRange(start,end);let lines=text.split('\n');return lines.slice(0,count).map(s=>s.endsWith('\r')?s.slice(0,-1):s)}
- async getAllSmall(){return this.file.text()}
+ async getBaseWindowLines(first,count){const begin=this.lineStarts[first-1]??this.size;const end=this.lineStarts[first+count-1]??this.size;return (await this.textRange(begin,end)).split('\n').slice(0,count).map(x=>x.replace(/\r$/,''))}\n async getAllSmall(){return this.file.text()}
  async replaceLines(start,end,newText){if(!this.indexComplete)throw Error('需等待索引完成');if(start<1||end<start||end>this.lineStarts.length)throw Error('行號範圍無效');const old=await this.getLines(start,end-start+1);const before=this.lineStarts[start-1];const after=this.lineStarts[end]??this.size;const replacement=newText+(after<this.size?'\n':'');this.mutations.push({start:before,end:after,text:replacement,old:old.join('\n')});this.mutations.sort((a,b)=>a.start-b.start);this.version++;const delta=newText.split('\n').length-(end-start+1);for(const block of this.blocks.values()){if(block.start> end){block.start+=delta;block.end+=delta}else if(block.end>=start){block.end+=delta;if(block.start>start)block.start=start}}return {delta,version:this.version}}
  async createBlock(start,end){if(!this.indexComplete)throw Error('索引尚未完成');if(start<1||end<start||end>this.lineStarts.length)throw Error('範圍無效');const id='B'+String(this.nextBlock++).padStart(4,'0');const content=(await this.getLines(start,end-start+1)).join('\n');const block={id,start,end,content};this.blocks.set(id,block);return block}
  async checkBlock(id){const b=this.blocks.get(id);if(!b)throw Error('Block ID 不存在');return {...b,content:(await this.getLines(b.start,b.end-b.start+1)).join('\n')}}
@@ -54,32 +54,55 @@ try{doc.vKey=await ClusterVJournal.fingerprint(file);const record=await ClusterV
  async create(){return this.open(new File([''],'未命名.txt',{type:'text/plain'}))}
  select(id){this.active=this.docs.find(x=>x.id===id)||null;showActiveStatus(this.active);this.notify();window.dispatchEvent(new Event('cluster:tab-change'))}
  close(id){this.docs=this.docs.filter(x=>x.id!==id);if(this.active?.id===id)this.active=this.docs.at(-1)||null;showActiveStatus(this.active);this.notify();window.dispatchEvent(new CustomEvent('cluster:file-close',{detail:{id}}))}
- async save(doc=this.active,saveAs=false){if(!doc)throw Error('沒有文件');if(doc.vError)throw Error('V 日誌異常，禁止覆寫原始文件');if(doc.saveBusy)throw Error('此文件已有儲存工作進行中');doc.saveBusy=true;try{if(doc.size>=100000&&doc.vOperations.length){
+ async save(doc=this.active,saveAs=false,forceMerge=false){if(!doc)throw Error('沒有文件');if(doc.vError)throw Error('V 日誌異常，禁止覆寫原始文件');if(doc.saveBusy)throw Error('此文件已有儲存工作進行中');doc.saveBusy=true;try{if(doc.size>=100000&&doc.vOperations.length){
   if(!doc.indexComplete)throw Error('行號索引尚未完成');
-  // OPT3: replacements are anchored to immutable Base byte ranges.
-  // A replacement may contain any number of lines. Overlapping original
-  // windows are not automatically merged because their edits can conflict.
+  // Derive minimal edits against immutable Base instead of treating each
+  // overlapping viewport as a conflicting full-window replacement.
   const latest=new Map();
-  for(const op of doc.vOperations){if(op.kind==='window')latest.set(op.start+':'+op.count,op)}
-  const patches=[...latest.values()].map(op=>{
+  for(const op of doc.vOperations)if(op.kind==='window')latest.set(op.start+':'+op.count,op);
+  const candidates=[];
+  for(const op of latest.values()){
     if(!Number.isInteger(op.start)||!Number.isInteger(op.count)||op.start<1||op.count<1)
       throw Error('V 操作的原始座標無效');
     const expected=Math.min(op.count,doc.lineStarts.length-op.start+1);
     if(expected<=0)throw Error('V 操作超出原始文件範圍');
-    const from=doc.lineStarts[op.start-1];
-    const to=doc.lineStarts[op.start+expected-1]??doc.size;
-    return {start:from,end:to,text:op.text,terminated:to<doc.size};
-  }).sort((a,b)=>a.start-b.start);
-  for(let i=1;i<patches.length;i++)if(patches[i].start<patches[i-1].end)
-    throw Error('V 原始區間重疊，必須先合併衝突；V 已保留');
-  for(const patch of patches){
-    if(patch.terminated){
-      const tail=new Uint8Array(await doc.file.slice(Math.max(0,patch.end-2),patch.end).arrayBuffer());
-      const suffix=tail.length>=2&&tail[tail.length-2]===13&&tail[tail.length-1]===10?'\r\n':'\n';
-      patch.text=patch.text.replace(/\r?\n$/,'')+suffix;
-    }
-    delete patch.terminated;
+    const base=await doc.getBaseWindowLines(op.start,expected);
+    const edited=op.text.split('\n').map(x=>x.replace(/\r$/,''));
+    let prefix=0;
+    while(prefix<base.length&&prefix<edited.length&&base[prefix]===edited[prefix])prefix++;
+    let suffix=0;
+    while(suffix<base.length-prefix&&suffix<edited.length-prefix&&
+      base[base.length-1-suffix]===edited[edited.length-1-suffix])suffix++;
+    const removed=base.length-prefix-suffix;
+    const added=edited.slice(prefix,edited.length-suffix);
+    if(!removed&&!added.length)continue;
+    const line=op.start+prefix;
+    candidates.push({line,removed,added,order:op.id||0});
   }
+  candidates.sort((a,b)=>a.line-b.line||a.order-b.order);
+  const selected=[];let conflicts=0;
+  for(const edit of candidates){
+    const overlap=selected.find(p=>
+      (edit.removed===0&&p.removed===0&&edit.line===p.line)||
+      (edit.removed===0&&edit.line>=p.line&&edit.line<p.line+p.removed)||
+      (p.removed===0&&p.line>=edit.line&&p.line<edit.line+edit.removed)||
+      (edit.removed>0&&p.removed>0&&edit.line<p.line+p.removed&&p.line<edit.line+edit.removed));
+    if(overlap){
+      // Identical edits can be deduplicated without prompting.
+      if(edit.line===overlap.line&&edit.removed===overlap.removed&&
+        edit.added.join('\n')===overlap.added.join('\n'))continue;
+      conflicts++;
+      if(!forceMerge)throw Error('V_ACTUAL_CONFLICT:'+conflicts);
+      if(edit.order>overlap.order){selected.splice(selected.indexOf(overlap),1);selected.push(edit)}
+    }else selected.push(edit);
+  }
+  selected.sort((a,b)=>a.line-b.line);
+  const patches=selected.map(edit=>{
+    const from=doc.lineStarts[edit.line-1]??doc.size;
+    const to=doc.lineStarts[edit.line+edit.removed-1]??doc.size;
+    const terminated=to<doc.size;
+    return {start:from,end:to,text:edit.added.join('\n')+(terminated?'\n':'')};
+  });
   doc.mutations=patches;
  }const revision=doc.vRevision;setDocStatus(doc,'yellow','V 與原始文件整合：準備快照',5);const blob=await doc.exportBlob();let handle=doc.handle;try{if(saveAs||!handle?.createWritable){if(!window.showSaveFilePicker)throw Error('瀏覽器不支援直接存檔，請使用支援 File System Access API 的瀏覽器');handle=await showSaveFilePicker({suggestedName:doc.name})}const writer=await handle.createWritable();let written=0;try{const reader=blob.stream().getReader();while(true){const {done,value}=await reader.read();if(done)break;await writer.write(value);written+=value.byteLength;setDocStatus(doc,'yellow',`整合寫入 ${Math.round(written/Math.max(1,blob.size)*100)}%`,10+Math.floor(written/Math.max(1,blob.size)*80))}setDocStatus(doc,'yellow','整合提交：確認原始文件',95);await writer.close()}catch(e){await writer.abort().catch(()=>{});throw e}doc.handle=handle;doc.file=await handle.getFile();doc.size=doc.file.size;doc.mutations=[];doc.pendingView=null;doc.vOperations=[];doc.dirty=false;if(doc.indexPromise)await doc.indexPromise;doc.lineStarts=[0];doc.indexComplete=false;doc.indexedBytes=0;doc.cache.clear();doc.nodes=[];await doc.init();if(this.active===doc){start=1;token++;void render()}if(doc.vKey)await ClusterVJournal.remove(doc.vKey);doc.vKey=await ClusterVJournal.fingerprint(doc.file);if(doc.vRevision!==revision){doc.dirty=true;setDocStatus(doc,'yellow','儲存期間出現新編輯，仍需同步',100)}else setDocStatus(doc,'green','原始文件同步成功',100);this.notify();this.emit('FileManager',`Committed "${doc.name}"`)}catch(e){setDocStatus(doc,'red','同步失敗：'+e.message,0);throw e}}finally{doc.saveBusy=false}}
 
@@ -180,7 +203,7 @@ fm.onChange(()=>{tabs();if(document.activeElement!==editor||shownDoc!==fm.active
 function setLoad(msg){$('clusterLoad').hidden=false;$('loadLabel').textContent=msg;$('loadPercent').textContent='';$('loadDetail').textContent=''}
 async function render(){const d=fm.active,t=++token;if(!d)return;shownDoc=d;editor.disabled=!d.indexComplete&&d.size>=100000;try{if(d.size<100000){editor.value=d.vOperations.length?([ ...d.vOperations ].reverse().find(x=>x.kind==='small')?.text??await d.getAllSmall()):d.mutations.length?d.mutations.at(-1).text:await d.getAllSmall();if(t!==token)return;start=1;const n=editor.value.split('\n').length;lastSmallText=editor.value;renderGutter(1,n);$('clusterLoad').hidden=true;return}if(!d.indexComplete){editor.disabled=true;editor.value='正在建立行號索引…';gutter.textContent='';setLoad('Indexing');if(!d.indexPromise)d.indexPromise=d.index(p=>{if(fm.active===d){$('loadLabel').textContent='Indexing';$('loadPercent').textContent=(p*100).toFixed(1)+'%'}}).then(()=>{if(fm.active===d)void render()}).catch(e=>emit('SegmentLoader','ERROR PR6:001 '+e.message)).finally(()=>{d.indexPromise=null});return}const lines=await d.getLines(start,count);if(t!==token)return;editor.value=d.pendingView&&d.pendingView.start===start?d.pendingView.text:lines.join('\n');renderGutter(start,editor.value.split('\n').length);setLoad(`Visible ${start}–${start+lines.length-1}`)}catch(e){emit('SegmentLoader','ERROR PR6:001 '+e.message)}}
 const action={new:()=>fm.create(),open:async()=>{try{if(window.showOpenFilePicker && window.isSecureContext){try{const handles=await window.showOpenFilePicker({multiple:true});for(const handle of handles){const file=await handle.getFile();await fm.open(file,handle);emit('FileManager',`External watch active: ${file.name}`)}await pollExternal();return}catch(err){if(err.name==='AbortError')return;emit('FileManager',`Native picker fallback: ${err.message}`)}}const picker=$('fileInput');if(!picker)throw Error('fileInput missing');picker.value='';picker.click();emit('FileManager','Open file picker requested')}catch(e){emit('FileManager','ERROR OPEN: '+e.message)}},save:()=>save(false),saveas:()=>save(true),saveall:async()=>{for(const d of fm.docs)await save(false,d)},closeall:()=>{if(fm.docs.some(d=>d.dirty)&&!confirm('有未儲存文件，確定全部關閉？'))return;for(const d of [...fm.docs])fm.close(d.id);window.ClusterTerminal?.closeAll?.()}};
-async function save(as=false,doc=fm.active){if(!doc)return;try{if(doc.pendingView){await doc.replaceLines(doc.pendingView.start,doc.pendingView.end,doc.pendingView.text);doc.pendingView=null}await flushV(doc);editor.disabled=true;try{await fm.save(doc,as)}finally{editor.disabled=false}tabs()}catch(e){emit('FileManager','ERROR '+e.message)}}
+async function save(as=false,doc=fm.active){if(!doc)return;try{if(doc.pendingView&&doc.size<100000){await doc.replaceLines(doc.pendingView.start,doc.pendingView.end,doc.pendingView.text);doc.pendingView=null}await flushV(doc);editor.disabled=true;try{await fm.save(doc,as)}catch(e){if(String(e.message).startsWith('V_ACTUAL_CONFLICT:')){const ok=confirm('偵測到實際 V 編輯範圍衝突。強制合併會依最新編輯覆蓋衝突區域，可能遺失較早的衝突修改。V 紀錄在儲存成功前仍會保留。是否強制合併？');if(ok)await fm.save(doc,as,true);else emit('FileManager','已取消強制合併；V 紀錄保留')}else throw e}finally{editor.disabled=false}tabs()}catch(e){emit('FileManager','ERROR '+e.message)}}
 $('fileButton').onclick=()=>{if(!$('fileMenu').hidden){/* closing */}else{$('blockDirectory').hidden=true;$('blockDirectoryButton').setAttribute('aria-expanded','false')} $('fileMenu').hidden=!$('fileMenu').hidden;$('fileButton').setAttribute('aria-expanded',String(!$('fileMenu').hidden))};$('fileMenu').addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;$('fileMenu').hidden=true;action[b.dataset.action]?.()});document.addEventListener('pointerdown',e=>{if(!e.target.closest('.menu-wrap'))$('fileMenu').hidden=true});
 $('fileInput').onchange=async e=>{const files=Array.from(e.target.files||[]);e.target.value='';for(const f of files){try{emit('FileManager',`Opening ${f.name}`);await fm.open(f);emit('FileManager',`Opened ${f.name}; external watch unavailable (File input has no persistent handle)`)}catch(err){emit('FileManager',`ERROR OPEN ${f.name}: ${err.message}`)}}};
 // [FIX-PR8] Center target line and prefetch surrounding slice window.
