@@ -15,3 +15,9 @@ body:not(.cluster-ai-active) #clusterAiPanel{display:none!important}
 /* P3: AI Agent is a status console, not a chat client. */
 #caiForm,#caiSettings,#caiStop,#caiProvider{display:none!important}
 #caiWorkspace .cai-feed{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+
+/* External AI connection guide: status-only, not a chat interface. */
+.cai-guide{margin:0 24px 18px;padding:18px 20px;border:1px solid #34343a;border-radius:10px;background:#111115;color:#e6e6ea;line-height:1.6;max-height:45%;overflow:auto}
+.cai-guide-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.cai-guide-head strong{font-size:15px}.cai-guide-head span{font-size:12px;color:#9b9ba6}
+.cai-guide-steps p{margin:10px 0;color:#c5c5cc}.cai-guide-actions{display:flex;gap:10px;flex-wrap:wrap}.cai-guide-actions a{padding:8px 12px;border:1px solid #4a4a55;border-radius:6px;background:#202026;color:#eee;text-decoration:none}.cai-guide-actions a:hover{background:#30303b}.cai-guide-state{border-top:1px solid #33343b;margin-top:14px;padding-top:10px;color:#b2b7c7}
+@media(max-width:600px){.cai-guide{margin:0 10px 10px;padding:12px;max-height:55%}}
