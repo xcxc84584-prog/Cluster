@@ -144,7 +144,22 @@ try{doc.vKey=await ClusterVJournal.fingerprint(file);const record=await ClusterV
     return {start:from,end:to,text:edit.added.join('\n')+(terminated?'\n':'')};
   });
   doc.mutations=patches;
- }const revision=doc.vRevision;setDocStatus(doc,'yellow','V 與原始文件整合：準備快照',5);const blob=await doc.exportBlob();let handle=doc.handle;try{if(saveAs||!handle?.createWritable){if(!window.showSaveFilePicker)throw Error('瀏覽器不支援直接存檔，請使用支援 File System Access API 的瀏覽器');handle=await showSaveFilePicker({suggestedName:doc.name})}const writer=await handle.createWritable();let written=0;try{const reader=blob.stream().getReader();while(true){const {done,value}=await reader.read();if(done)break;await writer.write(value);written+=value.byteLength;setDocStatus(doc,'yellow',`整合寫入 ${Math.round(written/Math.max(1,blob.size)*100)}%`,10+Math.floor(written/Math.max(1,blob.size)*80))}setDocStatus(doc,'yellow','整合提交：確認原始文件',95);await writer.close()}catch(e){await writer.abort().catch(()=>{});throw e}doc.handle=handle;doc.file=await handle.getFile();doc.size=doc.file.size;doc.mutations=[];doc.pendingView=null;doc.vOperations=[];doc.dirty=false;if(doc.indexPromise)await doc.indexPromise;doc.lineStarts=[0];doc.indexComplete=false;doc.indexedBytes=0;doc.cache.clear();doc.nodes=[];await doc.init();if(this.active===doc){start=1;token++;void render()}if(doc.vKey)await ClusterVJournal.remove(doc.vKey);doc.vKey=await ClusterVJournal.fingerprint(doc.file);if(doc.vRevision!==revision){doc.dirty=true;setDocStatus(doc,'yellow','儲存期間出現新編輯，仍需同步',100)}else setDocStatus(doc,'green','原始文件同步成功',100);this.notify();this.emit('FileManager',`Committed "${doc.name}"`)}catch(e){setDocStatus(doc,'red','同步失敗：'+e.message,0);throw e}}finally{doc.saveBusy=false}}
+ }const revision=doc.vRevision;setDocStatus(doc,'yellow','V 與原始文件整合：準備快照',5);const blob=await doc.exportBlob();let handle=doc.handle;try{if(saveAs||!handle?.createWritable){if(!window.showSaveFilePicker)throw Error('瀏覽器不支援直接存檔，請使用支援 File System Access API 的瀏覽器');handle=await showSaveFilePicker({suggestedName:doc.name})}const writer=await handle.createWritable();let written=0;try{const reader=blob.stream().getReader();while(true){const {done,value}=await reader.read();if(done)break;await writer.write(value);written+=value.byteLength;setDocStatus(doc,'yellow',`整合寫入 ${Math.round(written/Math.max(1,blob.size)*100)}%`,10+Math.floor(written/Math.max(1,blob.size)*80))}setDocStatus(doc,'yellow','整合提交：確認原始文件',95);await writer.close()}catch(e){await writer.abort().catch(()=>{});throw e}doc.handle=handle;doc.file=await handle.getFile();doc.size=doc.file.size;doc.mutations=[];doc.pendingView=null;doc.vOperations=[];doc.dirty=false;if(doc.indexPromise)await doc.indexPromise;doc.lineStarts=[0];doc.indexComplete=false;doc.indexedBytes=0;doc.cache.clear();doc.nodes=[];await doc.init();// Re-index the newly committed file before allowing the editor to render.
+ // Do not depend on the render() indexing callback: its indexPromise may
+ // still refer to the just-completed generation and leave the UI stuck.
+ doc.indexPromise=null;
+ setDocStatus(doc,'yellow','儲存完成，正在重新建立行號索引',96);
+ try{
+  doc.indexPromise=doc.index(p=>{
+   if(this.active===doc){
+    $('loadLabel').textContent='Reindexing';
+    $('loadPercent').textContent=(p*100).toFixed(1)+'%';
+   }
+  });
+  await doc.indexPromise;
+  if(!doc.indexComplete)throw Error('重新建立行號索引未完成');
+ }finally{doc.indexPromise=null}
+ if(this.active===doc){start=1;token++;await render();editor.disabled=false}if(doc.vKey)await ClusterVJournal.remove(doc.vKey);doc.vKey=await ClusterVJournal.fingerprint(doc.file);if(doc.vRevision!==revision){doc.dirty=true;setDocStatus(doc,'yellow','儲存期間出現新編輯，仍需同步',100)}else setDocStatus(doc,'green','原始文件同步成功',100);this.notify();this.emit('FileManager',`Committed "${doc.name}"`)}catch(e){setDocStatus(doc,'red','同步失敗：'+e.message,0);throw e}}finally{doc.saveBusy=false}}
 
 }
 
