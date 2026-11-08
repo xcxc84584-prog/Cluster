@@ -23,3 +23,7 @@
 #clusterSyntaxOverlay .token.operator,#clusterSyntaxOverlay .token.punctuation{color:#d6dae1}
 #clusterSyntaxOverlay .token.property,#clusterSyntaxOverlay .token.tag{color:#f07178}
 #clusterSyntaxOverlay .token.selector,#clusterSyntaxOverlay .token.attr-name{color:#ffcb6b}
+
+#clusterSyntaxOverlay{display:block;overflow:hidden!important}
+#clusterSyntaxCode{display:block;margin:0;border:0;overflow:visible;white-space:pre;word-wrap:normal;overflow-wrap:normal;pointer-events:none}
+#editorShell:not(.syntax-enabled) #clusterSyntaxOverlay{visibility:hidden}
