@@ -31,7 +31,7 @@ function setDocStatus(doc,kind,detail,progress){
 function showActiveStatus(doc){const x=doc?.saveState||{kind:'green',detail:'未選取文件',progress:100};ClusterVJournal.status(x.kind,x.detail,x.progress)}
 class SegmentDocument {
  constructor(file,emit=()=>{}){this.file=file;this.emit=emit;this.id=crypto.randomUUID();this.name=file.name;this.size=file.size;this.version=0;this.nodes=[];this.changes=[];this.blocks=new Map();this.blockAnchors=new Map();this.nextBlock=1;this.lineStarts=[0];this.indexedBytes=0;this.indexedLines=1;this.indexComplete=false;this.cache=new Map();this.cacheLimit=12;this.indexing=false;this.mutations=[];this.vOperations=[];this.vRevision=0;this.vKey=null;this.vError=null;this.saveState={kind:"green",detail:"已同步",progress:100};this.indexPromise=null;this.saveBusy=false;this.encoding='utf-8';this.encodingWarning=false;}  
- async init(){this.encoding=detectEncoding(new Uint8Array(await this.file.slice(0,65536).arrayBuffer()));this.encodingWarning=this.encoding!=='utf-8';if(this.encodingWarning)this.emit('SegmentLoader',this.name+': 偵測到 '+this.encoding+'，僅允許唯讀以防止中文毀損');const n=Math.max(1,Math.ceil(this.size/SLICE_BYTES));for(let i=0;i<n;i++){const start=i*SLICE_BYTES,end=Math.min(this.size,start+SLICE_BYTES);this.nodes.push({id:i,start,end,prev:i?i-1:null,next:i+1<n?i+1:null});if(i===n-1||i%128===0)this.emit('SegmentLoader',`Load "${this.name}",Slice:${Math.ceil(end/1024)}/${Math.ceil(this.size/1024)}KB`)}this.emit('SegmentLoader','Sliced loading successfully established.');return this}
+ async init(){this.encoding=detectEncoding(new Uint8Array(await this.file.slice(0,65536).arrayBuffer()));this.encodingWarning=this.encoding!=='utf-8';if(this.encodingWarning)this.emit('SegmentLoader',this.name+': 偵測到 '+this.encoding+'，請確認文字編碼；儲存已保護');const n=Math.max(1,Math.ceil(this.size/SLICE_BYTES));for(let i=0;i<n;i++){const start=i*SLICE_BYTES,end=Math.min(this.size,start+SLICE_BYTES);this.nodes.push({id:i,start,end,prev:i?i-1:null,next:i+1<n?i+1:null});if(i===n-1||i%128===0)this.emit('SegmentLoader',`Load "${this.name}",Slice:${Math.ceil(end/1024)}/${Math.ceil(this.size/1024)}KB`)}this.emit('SegmentLoader','Sliced loading successfully established.');return this}
  async getSlice(i){if(i<0||i>=this.nodes.length)return '';if(this.cache.has(i))return this.cache.get(i);const node=this.nodes[i];const text=new TextDecoder(this.encoding).decode(await this.file.slice(node.start,node.end).arrayBuffer());this.cache.set(i,text);if(this.cache.size>this.cacheLimit)this.cache.delete(this.cache.keys().next().value);return text}
  async textRange(start,end){start=Math.max(0,start);end=Math.min(this.size,end);if(end<=start)return '';return new TextDecoder(this.encoding).decode(await this.file.slice(start,end).arrayBuffer())}
  async index(onProgress=()=>{}){if(this.indexing)return;this.indexing=true;let offset=0,carryCR=false;const block=1024*1024;try{while(offset<this.size){const end=Math.min(this.size,offset+block);const bytes=new Uint8Array(await this.file.slice(offset,end).arrayBuffer());for(let i=0;i<bytes.length;i++){if(bytes[i]===10)this.lineStarts.push(offset+i+1)}offset=end;this.indexedBytes=offset;this.indexedLines=this.lineStarts.length;onProgress(offset/Math.max(1,this.size));if(offset%(8*block)===0)await new Promise(r=>setTimeout(r,0))}this.indexComplete=true;this.emit('SegmentLoader',`Index complete,lines:${this.lineStarts.length}`)}catch(e){this.emit('SegmentLoader',`ERROR PR6:001 ${e.message}`);throw e}finally{this.indexing=false}}
@@ -210,6 +210,17 @@ const fm=new FileManager(emit);window.cluster={fm,emit};let start=1,count=160,to
 const editor=$('editor'),gutter=$('gutter');
 // Read-only viewport coordinates for syntax highlighting; no document mutations.
 window.ClusterSyntaxViewport={start:()=>start,count:()=>count};
+window.ClusterEncoding={
+ get:()=>({name:fm.active?.name||'',encoding:fm.active?.encoding||'utf-8'}),
+ async set(label){
+  const d=fm.active;if(!d)throw Error('No active file');
+  if(d.dirty||d.vOperations.length||d.mutations.length)throw Error('文件含未儲存修改，請先備份或重新開啟後再切換編碼');
+  if(!['utf-8','gb18030','big5'].includes(label))throw Error('Unsupported encoding');
+  d.encoding=label;d.encodingWarning=label!=='utf-8';d.cache.clear();
+  token++;start=1;await render();
+  emit('SegmentLoader','Encoding: '+label+' (non-UTF-8 save protected)');
+ }
+};
 let lastSmallText='',externalSyncBusy=false;
 const vTimers=new Map();async function persistV(d){try{if(!d.vKey)d.vKey=await ClusterVJournal.fingerprint(d.file);setDocStatus(d,'yellow','正在記錄 V 操作',35);await ClusterVJournal.write(d.vKey,{revision:d.vRevision,operations:d.vOperations,mutations:d.mutations});d.vError=null;setDocStatus(d,'yellow',`V 已持久化（${d.vOperations.length} 筆），原始文件未同步`,100)}catch(e){d.vError=e;setDocStatus(d,'red','V 記錄失敗：'+e.message,0)}}
 function queueV(d,op){d.vOperations.push({...op,id:++d.vRevision,at:Date.now()});setDocStatus(d,'yellow','V 尚未完成持久化',5);clearTimeout(vTimers.get(d.id));vTimers.set(d.id,setTimeout(()=>persistV(d),350))}
