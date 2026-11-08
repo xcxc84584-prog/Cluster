@@ -45,6 +45,7 @@ function Find-Cloudflared {
  if($cmd -and $cmd.Source -and (Test-Path -LiteralPath $cmd.Source)){return $cmd.Source}
  $paths=@(
   (Join-Path $env:ProgramFiles 'cloudflared\cloudflared.exe'),
+  (Join-Path ${env:ProgramFiles(x86)} 'cloudflared\cloudflared.exe'),
   (Join-Path $env:ProgramFiles 'Cloudflare\cloudflared.exe'),
   (Join-Path $env:ProgramFiles 'Cloudflare\Cloudflared\cloudflared.exe'),
   (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links\cloudflared.exe'),
@@ -52,7 +53,7 @@ function Find-Cloudflared {
   (Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\cloudflared.exe')
  )
  foreach($candidate in $paths){if(Test-Path -LiteralPath $candidate){return $candidate}}
- foreach($root in @($env:ProgramFiles, $env:LOCALAPPDATA)){
+ foreach($root in @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:LOCALAPPDATA)){
   if(!$root -or !(Test-Path $root)){continue}
   $found=Get-ChildItem -LiteralPath $root -Filter 'cloudflared.exe' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
   if($found){return $found.FullName}
