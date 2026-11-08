@@ -374,7 +374,7 @@ editor.addEventListener('wheel',e=>{const d=fm.active;if(!d||d.size<100000||!d.i
 editor.addEventListener('scroll',()=>{gutter.scrollTop=editor.scrollTop;gutter.scrollLeft=editor.scrollLeft});
 const updatePos=()=>{const prefix=editor.value.slice(0,editor.selectionStart).split('\n');$('position').textContent=`Ln ${vDisplayLine(vLineMap(fm.active),start+prefix.length-1)}, Col ${prefix.at(-1).length+1}`};editor.addEventListener('click',updatePos);editor.addEventListener('keyup',updatePos);
 window.addEventListener('keydown',e=>{if(!e.ctrlKey)return;const k=e.key.toLowerCase();if(k==='n'||k==='o'||k==='s'){e.preventDefault();(k==='n'?action.new:k==='o'?action.open:e.shiftKey?action.saveas:action.save)()}});
-$('autoSyncToggle').disabled=false;$('autoSyncToggle').title='自動保存（需文件寫入權限）';
+
 const shell=document.createElement('button');shell.type='button';shell.textContent='PowerShell';shell.className='opt1-shell-link';shell.style.cssText='font-size:12px;color:#cddcff;background:transparent;cursor:pointer;border:1px solid #4a5262;border-radius:6px;padding:6px 10px';shell.onclick=()=>window.ClusterTerminal?.open();$('cexpToggle').after(shell);
 
 
