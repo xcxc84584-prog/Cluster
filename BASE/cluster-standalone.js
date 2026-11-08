@@ -166,45 +166,53 @@ function visualRowCount(text,columns,tabSize=4){
  }
  return rows;
 }
+// Virtualized visual-row gutter: a wrapped logical line may occupy hundreds
+// of viewport rows. Render only visible labels, not one DOM node per line.
+let gutterFirst=1,gutterRows=[],gutterPrefix=[0],gutterHeight=23.2,gutterFrame=0;
 function syncGutterGeometry(){
- if(!gutter||!editor)return;
  const style=getComputedStyle(editor);
- const lineHeight=parseFloat(style.lineHeight)||23.2;
- const font=style.font;
  const canvas=syncGutterGeometry.canvas||(syncGutterGeometry.canvas=document.createElement('canvas'));
- const context=canvas.getContext('2d');context.font=font;
- const charWidth=context.measureText('M').width||8;
- const innerWidth=editor.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
- const columns=Math.max(1,Math.floor(innerWidth/charWidth));
- const softWrap=style.whiteSpace!=='pre'&&style.whiteSpace!=='nowrap';
+ const ctx=canvas.getContext('2d');ctx.font=style.font;
+ const charWidth=ctx.measureText('M').width||8;
+ const available=editor.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
+ const cols=Math.max(1,Math.floor(available/charWidth));
+ const wraps=style.whiteSpace!=='pre'&&style.whiteSpace!=='nowrap';
+ gutterHeight=parseFloat(style.lineHeight)||23.2;
  const lines=editor.value.split('\\n');
- const nodes=gutter.children;
- for(let i=0;i<nodes.length;i++){
-  const row=nodes[i];
-  const visual=softWrap?visualRowCount(lines[i]||'',columns,parseInt(style.tabSize,10)||4):1;
-  row.style.setProperty('height',visual*lineHeight+'px','important');
-  row.style.setProperty('min-height',visual*lineHeight+'px','important');
-  row.style.lineHeight=lineHeight+'px';
+ gutterRows=lines.map(line=>wraps?visualRowCount(line,cols,parseInt(style.tabSize,10)||4):1);
+ gutterPrefix=[0];for(const n of gutterRows)gutterPrefix.push(gutterPrefix[gutterPrefix.length-1]+n);
+ paintVisibleGutter();
+}
+function paintVisibleGutter(){
+ if(!gutterRows.length)return;
+ const top=editor.scrollTop,first=Math.max(0,Math.floor(top/gutterHeight));
+ const visible=Math.ceil(editor.clientHeight/gutterHeight)+3;
+ const last=Math.min(gutterPrefix[gutterPrefix.length-1],first+visible);
+ let lo=0,hi=gutterRows.length;
+ while(lo<hi){const mid=(lo+hi)>>1;if(gutterPrefix[mid+1]<=first)lo=mid+1;else hi=mid}
+ const fragment=document.createDocumentFragment();
+ const paddingTop=parseFloat(getComputedStyle(editor).paddingTop)||0;
+ for(let row=first,i=lo;row<last;row++){
+  while(i+1<gutterPrefix.length&&row>=gutterPrefix[i+1])i++;
+  const span=document.createElement('span');span.className='line-number';
+  const continuation=row>gutterPrefix[i];
+  span.textContent=continuation?'↳'+(gutterFirst+i):String(gutterFirst+i);
+  span.style.cssText='position:absolute;right:10px;left:0;top:'+(paddingTop+row*gutterHeight-top)+'px;height:'+gutterHeight+'px;line-height:'+gutterHeight+'px;text-align:right;white-space:nowrap';
+  if(fm.active&&[...fm.active.blocks.values()].some(b=>gutterFirst+i>=b.start&&gutterFirst+i<=b.end))span.classList.add('cluster-block');
+  fragment.append(span);
  }
- gutter.scrollTop=editor.scrollTop;
+ gutter.style.position='relative';
+ gutter.replaceChildren(fragment);
 }
 function renderGutter(first,total){
-  const fragment=document.createDocumentFragment();
-  for(let i=0;i<Math.min(total,5000);i++){
-    const row=document.createElement('span');
-    row.className='line-number';
-    row.textContent=String(first+i);
-    if(fm.active && [...fm.active.blocks.values()].some(b=>first+i>=b.start&&first+i<=b.end))row.classList.add('cluster-block');
-    fragment.appendChild(row);
-  }
-  gutter.replaceChildren(fragment);
-  syncGutterGeometry();
+ gutterFirst=first;
+ syncGutterGeometry();
 }
 function refreshSmallGutter(){
   const d=fm.active;
   if(!d||d.size>=100000)return;
   const lines=editor.value.split('\n').length;
-  if(gutter.childElementCount!==Math.min(lines,5000))renderGutter(1,lines);
+  renderGutter(1,lines);
 }
 
 function tabs(){const list=$('tabList');const terminalVisible=!document.getElementById('clusterTerminalPanel')?.hidden;list.replaceChildren();for(const d of fm.docs){const el=document.createElement('div');el.className='tab'+(d===fm.active?' is-active':'');const select=document.createElement('button');select.className='tab-select';select.textContent=d.name+(d.dirty?' ●':'');select.onclick=()=>{window.ClusterTerminal?.deactivate?.();start=1;fm.select(d.id)};const close=document.createElement('button');close.className='tab-close';close.textContent='×';close.title='關閉文件';close.onclick=()=>{if(d.dirty&&!confirm('文件尚未儲存，確定關閉？'))return;fm.close(d.id)};el.dataset.tabKey='file:'+d.id;el.append(select,close);list.append(el)}$('empty').hidden=terminalVisible||!!fm.active;$('editorShell').hidden=terminalVisible||!fm.active;$('clusterBottomBar').hidden=terminalVisible||!fm.active;$('footerName').textContent=fm.active?.name||'未命名.txt';$('tierStatus').textContent=fm.active?(fm.active.size<100000?'L0':'L1'):'L0';updateBlockDirectory();window.ClusterTerminal?.syncTabs?.();window.ClusterTabOrder?.apply?.()}
@@ -234,7 +242,7 @@ $('fileButton').onclick=()=>{if(!$('fileMenu').hidden){/* closing */}else{$('blo
 $('fileInput').onchange=async e=>{const files=Array.from(e.target.files||[]);e.target.value='';for(const f of files){try{emit('FileManager',`Opening ${f.name}`);await fm.open(f);emit('FileManager',`Opened ${f.name}; external watch unavailable (File input has no persistent handle)`)}catch(err){emit('FileManager',`ERROR OPEN ${f.name}: ${err.message}`)}}};
 // [FIX-PR8] Center target line and prefetch surrounding slice window.
 const lineHeight=()=>{const st=getComputedStyle(editor);return parseFloat(st.lineHeight)||23.2};
-const centerLine=(localLine)=>{const h=lineHeight(),visible=Math.max(1,Math.floor(editor.clientHeight/h));editor.scrollTop=Math.max(0,(localLine-1-(visible-1)/2)*h);gutter.scrollTop=editor.scrollTop};
+const centerLine=(localLine)=>{const h=lineHeight(),visible=Math.max(1,Math.floor(editor.clientHeight/h));const visual=gutterPrefix[Math.max(0,localLine-1)]??localLine-1;editor.scrollTop=Math.max(0,(visual-(visible-1)/2)*h);paintVisibleGutter()};
 $('clusterGoLine').onclick=async()=>{const d=fm.active;if(!d)return;const n=Number($('clusterLine').value);if(!Number.isInteger(n)||n<1){emit('SegmentLoader','ERROR PR8:001 Invalid line');return}
  try{if(d.size<100000){const lines=editor.value.split('\n');if(n>lines.length)throw Error('Line out of range');const pos=lines.slice(0,n-1).join('\n').length+(n>1?1:0);editor.focus();editor.setSelectionRange(pos,pos);centerLine(n);return}
  if(!d.indexComplete||n>d.getViewLineCount())throw Error('Index unavailable or out of range');
@@ -257,7 +265,7 @@ async function shiftWindow(direction){
  pageShiftBusy=true;
  try{await flushV(d);const oldStart=start;start=next;await render();const h=lineHeight();
    editor.scrollTop=direction>0?Math.max(0,(oldStart+count-next-Math.ceil(editor.clientHeight/h))*h):Math.max(0,(oldStart-next)*h);
-   gutter.scrollTop=editor.scrollTop;
+   paintVisibleGutter();
  }catch(e){emit('SegmentLoader','Window shift failed: '+e.message)}finally{pageShiftBusy=false}
 }
 editor.addEventListener('wheel',e=>{const d=fm.active;if(!d||d.size<100000||!d.indexComplete||pageShiftBusy)return;
@@ -265,7 +273,7 @@ editor.addEventListener('wheel',e=>{const d=fm.active;if(!d||d.size<100000||!d.i
  const nearTop=editor.scrollTop<=2;
  if((e.deltaY>0&&nearBottom)||(e.deltaY<0&&nearTop)){e.preventDefault();void shiftWindow(e.deltaY>0?1:-1)}
 },{passive:false});
-editor.addEventListener('scroll',()=>{gutter.scrollTop=editor.scrollTop;gutter.scrollLeft=editor.scrollLeft});
+editor.addEventListener('scroll',()=>{if(gutterFrame)return;gutterFrame=requestAnimationFrame(()=>{gutterFrame=0;paintVisibleGutter()})});
 window.addEventListener('resize',()=>{if(!document.getElementById('editorShell')?.hidden)syncGutterGeometry()});
 const updatePos=()=>{const prefix=editor.value.slice(0,editor.selectionStart).split('\n');$('position').textContent=`Ln ${start+prefix.length-1}, Col ${prefix.at(-1).length+1}`};editor.addEventListener('click',updatePos);editor.addEventListener('keyup',updatePos);
 window.addEventListener('keydown',e=>{if(!e.ctrlKey)return;const k=e.key.toLowerCase();if(k==='n'||k==='o'||k==='s'){e.preventDefault();(k==='n'?action.new:k==='o'?action.open:e.shiftKey?action.saveas:action.save)()}});
