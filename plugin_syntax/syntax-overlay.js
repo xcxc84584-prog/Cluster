@@ -51,7 +51,7 @@ function syntaxT(key){return syntaxLabels[currentSyntaxLocale()][key]||key}
 function translateSyntaxUI(){
  document.querySelectorAll('[data-syntax-i18n]').forEach(el=>{el.textContent=syntaxT(el.dataset.syntaxI18n)});
  const open=document.getElementById('syntaxOpenPage');
- if(open)open.textContent='🎨　'+syntaxT('title');
+ if(open){const label=open.querySelector('.cluster-tool-text');if(label)label.textContent=syntaxT('title');else open.textContent='🎨　'+syntaxT('title');}
  const tab=document.querySelector('[data-tab-key="plugin:syntax"] .tab-select');
  if(tab)tab.textContent='🎨 '+syntaxT('title');
 }
