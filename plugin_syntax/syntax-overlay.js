@@ -75,7 +75,7 @@ function setupSyntaxPage(){
   if(pageActive){shell.hidden=true;empty.hidden=true;document.getElementById('clusterBottomBar').hidden=true}
  }
  function activate(){
-  pageActive=true;window.ClusterTerminal?.deactivate?.();
+  pageActive=true;window.ClusterTerminal?.deactivate?.();window.ClusterAI?.deactivate?.();
   document.getElementById('fileMenu').hidden=true;sync();
  }
  function deactivate(){
