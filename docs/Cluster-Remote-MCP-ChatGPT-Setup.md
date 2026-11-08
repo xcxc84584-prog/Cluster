@@ -119,3 +119,33 @@ P3.7.1 的一鍵腳本已提交 GitHub，但尚未在使用者 Windows 環境執
 ## 10. OAuth 測試快取修復（P3.7.3）
 
 使用者在 Node.js v24.22.0 執行 OAuth 本機測試時，舊版 CMD 仍下載 `.download` 腳本，出現 ERR_UNKNOWN_FILE_EXTENSION。已修正 `Cluster-OAuth-Local-Test.ps1` 的下載、語法檢查、刪除與移動路徑全部使用 `.download.cjs`，並將 `Cluster-OAuth-OneClick.cmd` 固定至修正版 Commit，採用隨機 TEMP 腳本檔名避免快取混淆。重新下載 CMD 後第一行應顯示 `Cluster OAuth Local Setup - v20261108-cachefix-3`。此修正尚待 Windows 實測。
+
+
+## 11. P3.8 ChatGPT OAuth 連接（新手版）
+
+2026-11-08 使用者已實測 OAuth 本機五項 PASS，以及 Cloudflare MCP URL 自動顯示 PASS。ChatGPT OAuth 實際連線尚未驗證。
+
+### 一鍵操作
+
+1. 開啟 Cluster 網頁、完成 BIND，保持本機 Agent 運作。
+2. 執行 MCP 啟動 CMD，確認本機 MCP ready（5 tools）；若只要 ChatGPT OAuth，詢問啟動原本 43880 Tunnel 時輸入 N。
+3. 執行 OAuth 本機測試 CMD，確認 LOCAL CHECKS PASSED。
+4. 執行 ChatGPT OAuth 連接 CMD（tools/mcp/Cluster-ChatGPT-OAuth-Connect.cmd）。它會建立新的臨時 HTTPS Tunnel 指向 43881，並啟動 OAuth Gateway。
+5. 複製畫面顯示的 ChatGPT OAuth MCP URL（完整 https://...trycloudflare.com/mcp）。
+6. ChatGPT → 外掛程式 → 新增 → 新增自訂 MCP 伺服器。名稱 Cluster、MCP URL 填步驟 5 網址、身分驗證選 OAuth。
+7. 如出現 Cluster 授權頁，先確認網址與步驟 5 相符，再在自己的瀏覽器輸入本機授權密碼。密碼檔案：%LOCALAPPDATA%/ClusterTerminalAgent/oauth-approval-password。不要貼給 ChatGPT 或他人。
+8. 註冊成功後先測試 cluster.get_status 與 cluster.list_files。失敗時只回報不含密鑰的錯誤訊息。
+
+### 兩種 MCP URL 不可混淆
+
+- MCP 啟動 CMD 的 URL 指向 43880（Bearer Token），不支援 ChatGPT OAuth。
+- ChatGPT OAuth 連接 CMD 的 URL 指向 43881（OAuth Gateway），ChatGPT 應使用這個。
+
+### 安全限制
+
+- 這是臨時測試部署，不是正式安全驗收通過的公開服務。Quick Tunnel 重啟後 URL 可能變更。
+- OAuth Gateway 的 Client/Token 存於記憶體，重啟後需重新授權。
+- 保留 43879、43880 的 loopback 限制及原本 Bearer Token，不可關閉驗證。
+- 目前僅五個唯讀工具，不包含 PowerShell 執行與檔案寫入。
+- 一鍵腳本會從本專案 GitHub 下載並執行程式，使用前請確認來源可信。
+- OAuth 外部完整授權、工具呼叫及安全測試尚待實測。
