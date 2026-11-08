@@ -20,7 +20,7 @@
 
  }
  function schedule(){if(restoring)return;clearTimeout(timer);timer=setTimeout(()=>checkpoint().catch(e=>window.cluster.emit('Workspace','Checkpoint ERROR '+e.message)),500)}
- el.addEventListener('input',schedule);el.addEventListener('keyup',schedule);el.addEventListener('scroll',schedule);fm.onChange(schedule);
+ el.addEventListener('input',schedule);el.addEventListener('keyup',schedule);el.addEventListener('scroll',schedule);fm.onChange(schedule);window.addEventListener('cluster:tab-order-change',schedule);
  window.addEventListener('pagehide',()=>{void checkpoint()});
  async function restore(){try{const session=await load('session','current');if(!session)return;
   const choice=confirm('恢復上次的編輯視窗？\n確定：全部保留未提交的編輯紀錄（V Journal）\n取消：刪除上次工作階段的未提交編輯紀錄。\n注意：刪除後無法復原。');
