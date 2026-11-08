@@ -71,20 +71,14 @@ if(!$exe){
  $exe=Find-Cloudflared
 }
 if(!$exe){
- Write-Host 'cloudflared is installed but its executable could not be located automatically.' -ForegroundColor Yellow
+ Write-Host 'cloudflared executable could not be located automatically.' -ForegroundColor Yellow
  $manual=Read-Host 'Enter full path to cloudflared.exe (or press Enter to exit)'
- $manual=($manual -replace '^[\s\x22]+|[\s\x22]+else{throw 'Cannot find cloudflared.exe. Check the installed application path.'}
-}
-Write-Host ('cloudflared ready: '+$exe) -ForegroundColor Green
-Write-Host ''
-Write-Host 'IMPORTANT: A temporary tunnel URL is NOT sufficient to register a ChatGPT connector.' -ForegroundColor Yellow
-Write-Host 'ChatGPT may require OAuth and a stable HTTPS URL. Never paste bearer tokens into chats.'
-$confirm=Read-Host 'Start temporary HTTPS tunnel? (Y/N)'
-if($confirm -notin @('Y','y')){exit 0}
-Write-Host 'Look for https://...trycloudflare.com in the output. Keep this window open.' -ForegroundColor Cyan
-& $exe tunnel --url http://127.0.0.1:43880 --no-autoupdate
-,'')
- if($manual -and (Test-Path -LiteralPath $manual -PathType Leaf)){$exe=$manual}else{throw 'Cannot find cloudflared.exe. Check the installed application path.'}
+ $manual=$manual.Trim().Trim([char]34)
+ if($manual -and (Test-Path -LiteralPath $manual -PathType Leaf)){
+  $exe=$manual
+ }else{
+  throw 'Cannot find cloudflared.exe. Check the installed application path.'
+ }
 }
 Write-Host ('cloudflared ready: '+$exe) -ForegroundColor Green
 Write-Host ''
