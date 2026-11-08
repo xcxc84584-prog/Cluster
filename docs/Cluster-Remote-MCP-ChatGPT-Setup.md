@@ -169,3 +169,16 @@ P3.7.1 的一鍵腳本已提交 GitHub，但尚未在使用者 Windows 環境執
 新版 ChatGPT OAuth Connect CMD（`P3.8.2-PORT-CONFIRM`）發現 43881 已被占用時，會顯示 PID、程序名稱及命令列，且**只有辨識為 node.exe 執行 oauth-mcp-gateway.cjs 的既有 Cluster Gateway**，才詢問 `Stop this existing Cluster OAuth Gateway and continue? (Y/N)`。輸入 Y 才會再次確認 PID、程序建立時間、命令列與埠號後停止舊程序，等待 43881 釋放再繼續；N 或其他輸入不會停止任何程序。非 Cluster 程序或多程序衝突一律拒絕自動關閉。43880 本地 MCP 不受影響。
 
 **操作提醒：** 停止舊 Gateway 會中斷既有 OAuth 授權與工作階段；新的 Cloudflare Quick Tunnel URL 可能不同，必須更新 ChatGPT 連接器。此版本已提交 GitHub，仍待 Windows 實測。
+
+## 14. P3.8.3：OAuth 同意表單 CSP 重新導向修復
+
+使用者在 P3.8.2 發現即使 `form-action` 已允許公開 issuer，Chrome 仍阻擋提交至 `/approve`。原因可能是表單 POST 後以 302 導向 ChatGPT 的回呼 Origin，而 CSP `form-action` 在重新導向鏈上也會檢查目標。P3.8.3 僅增加**已註冊且經驗證的 OAuth redirect_uri Origin** 至授權頁的 `form-action`，保留 issuer、`default-src 'none'`、`base-uri 'none'`、`frame-ancestors 'none'` 等安全限制。未開放任意來源。
+
+### 重新測試
+
+1. 重新下載 `Cluster-ChatGPT-OAuth-Connect.cmd`，確認 `P3.8.3-CSP-REDIRECT`。
+2. 若 43881 被舊版占用，檢查顯示的 PID 與命令列後，選擇 Y 才會停止舊 Cluster Gateway。
+3. 複製新 OAuth MCP URL，更新 ChatGPT 連接器並重新授權；按一次同意。
+4. 若仍失敗，回報 DevTools Console 的 CSP 訊息（勿公開 `code`、`state`、密碼、Token）。
+
+此修正已提交，**尚未完成 Windows/ChatGPT 實測**。
