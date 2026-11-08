@@ -12,8 +12,8 @@ if ([int]($version -replace '^v(\d+).*','$1') -lt 20) { throw ('Node.js 20+ requ
 Write-Host ('Node.js: '+$version) -ForegroundColor Green
 $source = 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/main/agent_terminal/oauth-mcp-gateway.cjs'
 Write-Host 'Downloading OAuth gateway source from Cluster GitHub...' -ForegroundColor Cyan
-Invoke-WebRequest -Uri $source -OutFile ($target+'.download') -UseBasicParsing
-& $node.Source --check ($target+'.download')
+Invoke-WebRequest -Uri $source -OutFile ($target+'.download.cjs') -UseBasicParsing
+& $node.Source --check ($target+'.download.cjs')
 if ($LASTEXITCODE -ne 0) { Remove-Item ($target+'.download') -Force; throw 'Gateway syntax check failed.' }
 Move-Item -Path ($target+'.download') -Destination $target -Force
 Write-Host ('Installed: '+$target) -ForegroundColor Green
