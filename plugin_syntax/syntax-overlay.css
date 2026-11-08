@@ -27,3 +27,16 @@
 #clusterSyntaxOverlay{display:block;overflow:hidden!important}
 #clusterSyntaxCode{display:block;margin:0;border:0;overflow:visible;white-space:pre;word-wrap:normal;overflow-wrap:normal;pointer-events:none}
 #editorShell:not(.syntax-enabled) #clusterSyntaxOverlay{visibility:hidden}
+
+/* Bilingual extension-rule controls in File > Tools. */
+#syntaxToolGroup{padding:5px 10px;max-width:340px}
+#syntaxToolGroup>summary{cursor:pointer;white-space:nowrap;font-size:13px}
+.syntax-tool-panel{display:flex;flex-direction:column;gap:6px;padding:10px 0 5px;min-width:265px;font-size:12px}
+.syntax-tool-panel label{color:#b8bdc9}
+.syntax-tool-panel input,.syntax-tool-panel select{width:100%;box-sizing:border-box;min-height:29px;background:#16191f;color:#f2f4f8;border:1px solid #515968;border-radius:4px;padding:4px 7px}
+.syntax-tool-actions{display:flex;gap:5px}
+.syntax-tool-actions button{flex:1;min-width:0;padding:5px 3px;border:1px solid #50596b;background:#272e3d;color:#fff;border-radius:4px;cursor:pointer;font-size:12px}
+#syntaxExtStatus{min-height:15px;color:#a9c9ee;white-space:normal}
+.syntax-ext-entries{max-height:180px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.syntax-ext-entry{width:100%;text-align:left;background:#181c24;color:#e4e9f1;border:0;border-radius:3px;padding:4px 7px;cursor:pointer;font-family:monospace;font-size:12px}
+.syntax-ext-entry:hover{background:#303b4f}
