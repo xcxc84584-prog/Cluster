@@ -1,0 +1,38 @@
+/* Cluster Development Environment: editor-native dark workspace */
+#clusterDevelopmentPanel{--dev-bg:#101116;--dev-surface:#191b22;--dev-raised:#22252f;--dev-border:#343844;--dev-text:#f0f1f5;--dev-muted:#9ba3b5;--dev-accent:#8ba4ff;box-sizing:border-box;background:var(--dev-bg)!important;color:var(--dev-text)!important;padding:0!important;overflow:hidden!important;font:14px/1.5 Inter,system-ui,"Microsoft JhengHei",sans-serif}
+#clusterDevelopmentPanel[hidden]{display:none!important}
+#clusterDevelopmentPanel .dev-layout{height:100%;display:flex;flex-direction:column;min-width:0}
+#clusterDevelopmentPanel .dev-heading{padding:22px 28px 16px;border-bottom:1px solid var(--dev-border);background:#171920}
+#clusterDevelopmentPanel .dev-eyebrow{color:var(--dev-accent);font-size:11px;font-weight:700;letter-spacing:.13em}
+#clusterDevelopmentPanel .dev-heading h2{font-size:23px;font-weight:680;margin:3px 0}
+#clusterDevelopmentPanel .dev-subtitle{color:var(--dev-muted);margin:0 0 16px;font-size:13px}
+#clusterDevelopmentPanel .dev-search{width:100%;max-width:660px;padding:11px 14px;background:#101217;border:1px solid #404656;border-radius:9px;color:var(--dev-text);outline:none}
+#clusterDevelopmentPanel .dev-search:focus{border-color:var(--dev-accent);box-shadow:0 0 0 2px #8ba4ff25}
+#clusterDevelopmentPanel .dev-workspace{display:grid;grid-template-columns:172px minmax(230px,1fr) minmax(270px, .9fr);flex:1;min-height:0}
+#clusterDevelopmentPanel .dev-sidebar{padding:16px 10px;border-right:1px solid var(--dev-border);background:#15171d;overflow:auto}
+#clusterDevelopmentPanel .dev-sidebar-title{font-size:11px;color:var(--dev-muted);padding:8px 12px;letter-spacing:.1em;text-transform:uppercase}
+#clusterDevelopmentPanel .dev-filter{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;padding:10px 12px;border:0;border-radius:7px;background:transparent;color:#bfc4d2;text-align:left;font-size:13px}
+#clusterDevelopmentPanel .dev-filter[aria-pressed="true"]{background:#303b59;color:#e9eeff}
+#clusterDevelopmentPanel .dev-count{font-variant-numeric:tabular-nums;color:var(--dev-muted);font-size:12px}
+#clusterDevelopmentPanel .dev-list{overflow:auto;min-width:0;border-right:1px solid var(--dev-border)}
+#clusterDevelopmentPanel .dev-list-meta{position:sticky;top:0;background:#15171de8;backdrop-filter:blur(10px);padding:11px 18px;color:var(--dev-muted);font-size:12px;border-bottom:1px solid var(--dev-border);z-index:1}
+#clusterDevelopmentPanel .dev-item{display:flex;align-items:center;gap:13px;width:100%;border:0;border-bottom:1px solid #2a2d37;background:transparent;color:inherit;padding:15px 18px;text-align:left}
+#clusterDevelopmentPanel .dev-item:hover{background:#20242e}
+#clusterDevelopmentPanel .dev-item[aria-selected="true"]{background:#242c40;box-shadow:inset 3px 0 var(--dev-accent)}
+#clusterDevelopmentPanel .dev-glyph{width:40px;height:40px;display:grid;place-items:center;border-radius:10px;background:#303c59;color:#c4d0ff;font-weight:750;font-size:14px;flex:none}
+#clusterDevelopmentPanel .dev-item-name{display:block;font-weight:650;font-size:14px}
+#clusterDevelopmentPanel .dev-item-desc{display:block;color:var(--dev-muted);font-size:12px;margin-top:3px}
+#clusterDevelopmentPanel .dev-details{padding:24px;overflow:auto;min-width:0}
+#clusterDevelopmentPanel .dev-detail-head{display:flex;gap:14px;align-items:center;margin-bottom:20px}
+#clusterDevelopmentPanel .dev-details h3{font-size:20px;margin:0}
+#clusterDevelopmentPanel .dev-muted{color:var(--dev-muted);font-size:12px}
+#clusterDevelopmentPanel .dev-section{border-top:1px solid var(--dev-border);padding:18px 0}
+#clusterDevelopmentPanel .dev-section-title{font-size:12px;font-weight:700;letter-spacing:.05em;margin-bottom:12px}
+#clusterDevelopmentPanel .dev-actions{display:flex;flex-wrap:wrap;gap:8px}
+#clusterDevelopmentPanel .dev-action{padding:9px 12px;border-radius:7px;border:1px solid #454c5c;background:#252b39;color:#e8ebf5;font-size:12px}
+#clusterDevelopmentPanel .dev-action:hover{background:#34415d}
+#clusterDevelopmentPanel .dev-action.primary{background:#435b9a;border-color:#657fbe;color:white}
+#clusterDevelopmentPanel .dev-command{font:12px/1.6 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:#0b0d12;border:1px solid #333744;border-radius:8px;padding:12px;color:#c5d3ff}
+#clusterDevelopmentPanel .dev-empty{padding:30px;color:var(--dev-muted)}
+@media(max-width:900px){#clusterDevelopmentPanel .dev-workspace{grid-template-columns:130px minmax(190px,1fr)}#clusterDevelopmentPanel .dev-details{grid-column:1/-1;border-top:1px solid var(--dev-border);max-height:45vh}#clusterDevelopmentPanel .dev-sidebar{padding:10px 4px}}
+@media(max-width:550px){#clusterDevelopmentPanel .dev-heading{padding:15px}#clusterDevelopmentPanel .dev-workspace{grid-template-columns:1fr}#clusterDevelopmentPanel .dev-sidebar{display:flex;gap:5px;border-right:0;border-bottom:1px solid var(--dev-border);overflow:auto}#clusterDevelopmentPanel .dev-sidebar-title{display:none}#clusterDevelopmentPanel .dev-filter{width:auto;white-space:nowrap}#clusterDevelopmentPanel .dev-list{max-height:40vh;border-right:0}#clusterDevelopmentPanel .dev-details{grid-column:1;padding:15px}}
