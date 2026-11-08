@@ -18,6 +18,7 @@ const bearerPath=path.join(dir,'remote-mcp-token');
 if(!fs.existsSync(adminPath))fs.writeFileSync(adminPath,crypto.randomBytes(24).toString('base64url')+'\n',{mode:0o600,flag:'wx'});
 const password=fs.readFileSync(adminPath,'utf8').trim();
 const clients=new Map(),codes=new Map(),tokens=new Map(),pending=new Map();
+const failedApprovals=new Map();
 const now=()=>Date.now(),random=()=>crypto.randomBytes(32).toString('base64url');
 const secureEqual=(a,b)=>{if(typeof a!=='string'||typeof b!=='string')return false;const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&crypto.timingSafeEqual(x,y)};
 const respond=(res,status,obj,extra={})=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extra});res.end(JSON.stringify(obj))};
@@ -41,6 +42,7 @@ const server=http.createServer(async(req,res)=>{
    const data=JSON.parse(await body(req));
    if(!Array.isArray(data.redirect_uris)||data.redirect_uris.length<1||data.redirect_uris.length>8||!data.redirect_uris.every(validRedirect))return fail(res,400,'invalid_redirect_uri');
    if(data.token_endpoint_auth_method&&data.token_endpoint_auth_method!=='none')return fail(res,400,'invalid_client_metadata','Only public PKCE clients supported');
+   if(clients.size>=200)return fail(res,429,'temporarily_unavailable','Client registration limit reached');
    const id=random();
    clients.set(id,{redirects:data.redirect_uris,created:now()});
    return respond(res,201,{client_id:id,client_id_issued_at:Math.floor(now()/1000),redirect_uris:data.redirect_uris,token_endpoint_auth_method:'none',grant_types:['authorization_code'],response_types:['code']});
@@ -61,7 +63,14 @@ const server=http.createServer(async(req,res)=>{
    const f=new URLSearchParams(await body(req)),ticket=f.get('ticket'),p=pending.get(ticket);
    if(!p)return fail(res,400,'invalid_request','Approval expired');
    if(f.get('decision')==='deny'){pending.delete(ticket);return oauthErrorRedirect(res,p.uri,p.state,'access_denied')}
-   if(!secureEqual(f.get('password'),password))return fail(res,403,'access_denied','Incorrect local approval password');
+   const attempts=failedApprovals.get(ticket)||{count:0};
+   if(attempts.count>=5){pending.delete(ticket);return fail(res,429,'access_denied','Too many failed attempts; restart authorization');}
+   if(!secureEqual(f.get('password'),password)){
+    attempts.count++;failedApprovals.set(ticket,attempts);
+    if(attempts.count>=5)pending.delete(ticket);
+    return fail(res,403,'access_denied','Incorrect local approval password');
+   }
+   failedApprovals.delete(ticket);
    pending.delete(ticket);
    const code=random();codes.set(code,{...p,expires:now()+60000});
    const target=new URL(p.uri);target.searchParams.set('code',code);target.searchParams.set('state',p.state);
