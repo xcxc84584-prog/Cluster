@@ -153,6 +153,41 @@ async function flushV(d){clearTimeout(vTimers.get(d.id));if(d.vOperations.length
 // [FIX-001] Gutter uses one non-wrapping DOM row per physical line.
 // The old CSS sets #gutter{white-space:normal}; textContent with newline characters
 // collapses into spaces and wraps as '1 2 3' instead of one number per row.
+// Match textarea soft wraps: each logical line occupies one or more visual rows.
+// Keep the line number on its first visual row and leave continuation rows blank.
+function visualRowCount(text,columns,tabSize=4){
+ let col=0,rows=1;
+ for(let i=0;i<text.length;i++){
+  const ch=text.charCodeAt(i);
+  const width=ch===9?tabSize-col%tabSize:1;
+  if(col+width>columns){rows++;col=0}
+  col+=width;
+  if(col===columns&&i<text.length-1){rows++;col=0}
+ }
+ return rows;
+}
+function syncGutterGeometry(){
+ if(!gutter||!editor)return;
+ const style=getComputedStyle(editor);
+ const lineHeight=parseFloat(style.lineHeight)||23.2;
+ const font=style.font;
+ const canvas=syncGutterGeometry.canvas||(syncGutterGeometry.canvas=document.createElement('canvas'));
+ const context=canvas.getContext('2d');context.font=font;
+ const charWidth=context.measureText('M').width||8;
+ const innerWidth=editor.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
+ const columns=Math.max(1,Math.floor(innerWidth/charWidth));
+ const softWrap=style.whiteSpace!=='pre'&&style.whiteSpace!=='nowrap';
+ const lines=editor.value.split('\\n');
+ const nodes=gutter.children;
+ for(let i=0;i<nodes.length;i++){
+  const row=nodes[i];
+  const visual=softWrap?visualRowCount(lines[i]||'',columns,parseInt(style.tabSize,10)||4):1;
+  row.style.setProperty('height',visual*lineHeight+'px','important');
+  row.style.setProperty('min-height',visual*lineHeight+'px','important');
+  row.style.lineHeight=lineHeight+'px';
+ }
+ gutter.scrollTop=editor.scrollTop;
+}
 function renderGutter(first,total){
   const fragment=document.createDocumentFragment();
   for(let i=0;i<Math.min(total,5000);i++){
@@ -163,6 +198,7 @@ function renderGutter(first,total){
     fragment.appendChild(row);
   }
   gutter.replaceChildren(fragment);
+  syncGutterGeometry();
 }
 function refreshSmallGutter(){
   const d=fm.active;
@@ -230,6 +266,7 @@ editor.addEventListener('wheel',e=>{const d=fm.active;if(!d||d.size<100000||!d.i
  if((e.deltaY>0&&nearBottom)||(e.deltaY<0&&nearTop)){e.preventDefault();void shiftWindow(e.deltaY>0?1:-1)}
 },{passive:false});
 editor.addEventListener('scroll',()=>{gutter.scrollTop=editor.scrollTop;gutter.scrollLeft=editor.scrollLeft});
+window.addEventListener('resize',()=>{if(!document.getElementById('editorShell')?.hidden)syncGutterGeometry()});
 const updatePos=()=>{const prefix=editor.value.slice(0,editor.selectionStart).split('\n');$('position').textContent=`Ln ${start+prefix.length-1}, Col ${prefix.at(-1).length+1}`};editor.addEventListener('click',updatePos);editor.addEventListener('keyup',updatePos);
 window.addEventListener('keydown',e=>{if(!e.ctrlKey)return;const k=e.key.toLowerCase();if(k==='n'||k==='o'||k==='s'){e.preventDefault();(k==='n'?action.new:k==='o'?action.open:e.shiftKey?action.saveas:action.save)()}});
 $('autoSyncToggle').disabled=false;$('autoSyncToggle').title='自動保存（需文件寫入權限）';
