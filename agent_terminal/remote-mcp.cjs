@@ -16,6 +16,9 @@ const upstream='http://127.0.0.1:'+(process.env.CLUSTER_TERMINAL_PORT||43879);
 fs.mkdirSync(configDir,{recursive:true});
 if(!fs.existsSync(accessPath))fs.writeFileSync(accessPath,crypto.randomBytes(32).toString('hex')+'\n',{mode:0o600,flag:'wx'});
 const accessToken=fs.readFileSync(accessPath,'utf8').trim();
+// OAuth compatibility is implemented by a separate gateway; the local MCP remains
+// bound to loopback and continues to require its independent bearer credential.
+// Never accept unauthenticated remote requests on this port.
 const tools=[
  {name:'cluster.get_status',description:'Get status of the paired Cluster local Agent and browser editor.',inputSchema:{type:'object',properties:{},additionalProperties:false}},
  {name:'cluster.get_task_status',description:'Get recent local task states.',inputSchema:{type:'object',properties:{},additionalProperties:false}},
