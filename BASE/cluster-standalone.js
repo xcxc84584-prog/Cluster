@@ -234,8 +234,30 @@ window.ClusterEncoding={
   emit('SegmentLoader','Encoding: '+label+' (non-UTF-8 save protected)');
  }
 };
+const STORAGE_PRIORITY_KEY='cluster.storage.priority.v1';
+let storagePriority='internal';
+try{storagePriority=localStorage.getItem(STORAGE_PRIORITY_KEY)==='external'?'external':'internal'}catch{}
+function initStoragePriority(){
+ const select=$('clusterStoragePriority'),label=$('storagePriorityLabel'),language=$('uiLanguage');
+ if(!select)return;
+ select.value=storagePriority;
+ const translate=()=>{
+  const en=language?.value==='en';
+  if(label)label.textContent=en?'Storage priority':'存儲優先級';
+  for(const option of select.options)option.textContent=option.value==='external'?(en?'External':'外部'):(en?'Internal':'內部');
+  select.title=en?'External: discard unsaved local edits when disk file changes; Internal: protect local edits.':'外部：磁碟文件變更時捨棄未提交的本地修改；內部：保護本地修改';
+ };
+ language?.addEventListener('change',translate);
+ select.addEventListener('change',()=>{
+  storagePriority=select.value==='external'?'external':'internal';
+  try{localStorage.setItem(STORAGE_PRIORITY_KEY,storagePriority)}catch{}
+  emit('FileManager',storagePriority==='external'?'Storage priority: External (unsaved edits may be discarded)':'Storage priority: Internal');
+ });
+ translate();
+}
+initStoragePriority();
 let lastSmallText='',externalSyncBusy=false;
-const vTimers=new Map();async function persistV(d){try{if(!d.vKey)d.vKey=await ClusterVJournal.fingerprint(d.file);setDocStatus(d,'yellow','正在記錄 V 操作',35);await ClusterVJournal.write(d.vKey,{revision:d.vRevision,operations:d.vOperations,mutations:d.mutations});d.vError=null;setDocStatus(d,'yellow',`V 已持久化（${d.vOperations.length} 筆），原始文件未同步`,100)}catch(e){d.vError=e;setDocStatus(d,'red','V 記錄失敗：'+e.message,0)}}
+const vTimers=new Map();async function persistV(d){if(d._discardExternal)return;const task=(async()=>{try{if(d._discardExternal)return;if(!d.vKey)d.vKey=await ClusterVJournal.fingerprint(d.file);setDocStatus(d,'yellow','正在記錄 V 操作',35);await ClusterVJournal.write(d.vKey,{revision:d.vRevision,operations:d.vOperations,mutations:d.mutations});d.vError=null;setDocStatus(d,'yellow',`V 已持久化（${d.vOperations.length} 筆），原始文件未同步`,100)}catch(e){d.vError=e;setDocStatus(d,'red','V 記錄失敗：'+e.message,0)}})();d._vPersistPromise=task;try{await task}finally{if(d._vPersistPromise===task)d._vPersistPromise=null}}
 function queueV(d,op){d.vOperations.push({...op,id:++d.vRevision,at:Date.now()});setDocStatus(d,'yellow','V 尚未完成持久化',5);clearTimeout(vTimers.get(d.id));vTimers.set(d.id,setTimeout(()=>persistV(d),350))}
 async function flushV(d){clearTimeout(vTimers.get(d.id));if(d.vOperations.length)await persistV(d);if(d.vError)throw d.vError}
 
@@ -418,8 +440,27 @@ $('plibBlockForm').onsubmit=async e=>{e.preventDefault();const d=fm.active;if(!d
 async function pollExternal(){if(externalSyncBusy||document.hidden)return;externalSyncBusy=true;
  try{for(const d of fm.docs){if(!d.handle?.getFile)continue;try{
  const f=await d.handle.getFile();if(f.lastModified===d.file.lastModified&&f.size===d.file.size)continue;
- if(d.dirty||d.pendingView){emit('FileManager',`CONFLICT External edit: ${d.name} (local dirty; not overwritten)`);continue}
- const old=d.file;d.file=f;d.size=f.size;d.nodes=[];d.cache.clear();d.lineStarts=[0];d.indexComplete=false;d.indexedBytes=0;d.mutations=[];d.pendingView=null;await d.init();
+ if(d.saveBusy){continue}
+ const hasLocal=!!(d.dirty||d.pendingView||d.vOperations.length||d.mutations.length);
+ if(hasLocal&&storagePriority==='internal'){emit('FileManager',`CONFLICT External edit: ${d.name} (internal priority; local edits preserved)`);continue}
+ // External priority is intentionally destructive. Only discard after confirming
+ // a new disk snapshot and ensuring pending V writes cannot repopulate the journal.
+ if(hasLocal){
+  clearTimeout(vTimers.get(d.id));vTimers.delete(d.id);
+  d._discardExternal=true;
+  if(d._vPersistPromise)try{await d._vPersistPromise}catch{}
+  if(d.vKey)await ClusterVJournal.remove(d.vKey);
+ }
+ if(d.indexPromise)try{await d.indexPromise}catch{}
+ const old=d.file;
+ d.file=f;d.size=f.size;d.nodes=[];d.cache.clear();d.lineStarts=[0];
+ d.indexComplete=false;d.indexedBytes=0;d.indexedLines=1;d.indexing=false;
+ d.mutations=[];d.pendingView=null;d.currentBaseLines=null;d.vOperations=[];d.vRevision=0;
+ d.vError=null;d.dirty=false;d.logical=null;d.logicalBlob=null;d._discardExternal=false;
+ d.vKey=await ClusterVJournal.fingerprint(f);
+ await d.init();
+ setDocStatus(d,'green','已同步外部文件 / External file synchronized',100);
+ fm.notify();
  emit('FileManager',`External sync: ${d.name} ${old.lastModified} -> ${f.lastModified}`);if(fm.active===d)await render();
  }catch(err){if(err.name!=='NotAllowedError')emit('FileManager',`External check failed: ${d.name} ${err.message}`)}}
  }finally{externalSyncBusy=false}}
