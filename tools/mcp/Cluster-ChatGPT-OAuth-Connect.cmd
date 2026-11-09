@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title Cluster ChatGPT OAuth Connect
+title Cluster ChatGPT OAuth Connect - v20261109-safe-update-1
 echo Cluster ChatGPT OAuth Connect - P3.9.3-DARK-OAUTH
 echo Requires a running Cluster MCP server. OAuth Gateway installs automatically.
 echo.
