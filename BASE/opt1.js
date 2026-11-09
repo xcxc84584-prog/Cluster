@@ -53,7 +53,7 @@ editor.addEventListener('scroll',()=>{gutter.scrollTop=editor.scrollTop;gutter.s
 const updatePos=()=>{const prefix=editor.value.slice(0,editor.selectionStart).split('\n');$('position').textContent=`Ln ${start+prefix.length-1}, Col ${prefix.at(-1).length+1}`};editor.addEventListener('click',updatePos);editor.addEventListener('keyup',updatePos);
 window.addEventListener('keydown',e=>{if(!e.ctrlKey)return;const k=e.key.toLowerCase();if(k==='n'||k==='o'||k==='s'){e.preventDefault();(k==='n'?action.new:k==='o'?action.open:e.shiftKey?action.saveas:action.save)()}});
 $('autoSyncToggle').disabled=false;$('autoSyncToggle').title='自動保存（需文件寫入權限）';
-const shell=document.createElement('a');shell.href='../local-powershell/';shell.textContent='PowerShell';shell.className='opt1-shell-link';shell.style.cssText='font-size:12px;color:#cddcff;text-decoration:none;border:1px solid #4a5262;border-radius:6px;padding:6px 10px';$('cexpToggle').after(shell);
+const shell=document.createElement('a');shell.href='../local-powershell/';shell.textContent='PowerShell';shell.className='opt1-shell-link';shell.style.cssText='font-size:12px;color:#cddcff;text-decoration:none;border:1px solid #4a5262;border-radius:6px;padding:6px 10px';(document.getElementById('clusterAiOpen')||$('cexpToggle')).after(shell);
 
 
 // [ADD-001] Block UI: stable BlockID, named line range, locate/delete and current content.
