@@ -41,7 +41,7 @@ function equalToken(candidate){if(typeof candidate!=='string')return false;const
 async function upstreamCall(name,args){
  const token=fs.readFileSync(pairingPath,'utf8').trim();
  const route=name==='cluster.get_status'?'/mcp/status':name==='cluster.get_task_status'?'/mcp/tasks':'/mcp/call';
- const response=await fetch(upstream+route,{method:route==='/mcp/call'?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(route==='/mcp/call'?{body:JSON.stringify({name,arguments:args||{}})}:{}),signal:AbortSignal.timeout(14000)});
+ const response=await fetch(upstream+route,{method:route==='/mcp/call'?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(route==='/mcp/call'?{body:JSON.stringify({name,arguments:args||{}})}:{}),signal:AbortSignal.timeout(name==='cluster.powershell_request'?145000:14000)});
  const data=await response.json();
  if(!response.ok)throw Error(data.error||'Local Agent HTTP '+response.status);
  return data;
