@@ -30,6 +30,7 @@ const explorerTools=Object.freeze({
   const tr=(zh,en)=>lang()==='zh'?zh:en;
   const roots=api.roots;
   const segments=String(args.path||'').split('/').filter(Boolean);
+  if(name==='cluster.list_roots'){message((lang()==='zh'?'查詢 Explorer 根目錄':'Listed Explorer roots'));return roots.map(n=>({name:n.name,kind:n.kind}));}
   if(!segments.length||segments.some(x=>x==='.'||x==='..'||x.includes('\\')||x.includes('\\0')))throw Error('Invalid Explorer path');
   const root=roots.find(n=>n.name===segments[0]);
   if(!root)throw Error('Explorer root not found');
@@ -40,7 +41,7 @@ const explorerTools=Object.freeze({
   }
   const audit=(zh,en,kind='system')=>message('['+new Date().toLocaleTimeString()+'] '+tr(zh,en),kind);
   const check=async(write=false)=>{if(await handle.queryPermission?.({mode:write?'readwrite':'read'})!=='granted')throw Error('Explorer browser permission required; grant access in Explorer first');};
-  if(name==='cluster.list_roots'){return roots.map(n=>({name:n.name,kind:n.kind}));}
+  
   if(name==='cluster.list_directory'){
    if(handle.kind!=='directory')throw Error('Not a directory');await check();
    const items=[];for await(const h of handle.values()){if(h.name==='.cluster-explorer-order.json')continue;items.push({name:h.name,kind:h.kind});if(items.length>=500)break;}
