@@ -84,7 +84,7 @@ function script(p,kind){
  let run=cmd;
  if(needsPython)run=cmd.replace(/\\bpy -m /g,'py -3.13 -m ');
  if(p[0]==='typescript')run=cmd.replace(/\\bnpm /g,'npm.cmd ');
- if(p[0]==='msys2'&&kind==='install')run='winget install --id MSYS2.MSYS2 -e --accept-package-agreements --accept-source-agreements && if exist "C:\\\\msys64\\\\usr\\\\bin\\\\bash.exe" ("C:\\\\msys64\\\\usr\\\\bin\\\\bash.exe" -lc "pacman -Sy --noconfirm mingw-w64-ucrt-x86_64-gcc") else (echo MSYS2 shell not found; reopen terminal and finish installation. & exit /b 1)';
+ if(p[0]==='msys2'&&kind==='install')run='winget install --id MSYS2.MSYS2 -e --accept-package-agreements --accept-source-agreements && if exist "C:\\msys64\\usr\\bin\\bash.exe" ("C:\\msys64\\usr\\bin\\bash.exe" -lc "pacman -Sy --noconfirm mingw-w64-ucrt-x86_64-gcc") else (echo MSYS2 shell not found; reopen terminal and finish installation. & exit /b 1)';
  lines.push(run,'if errorlevel 1 goto failed','echo Installation command completed.','set "result=0"','goto finish',':failed','echo Installation failed. Review prerequisites and command output.','set "result=1"',':finish','echo Exit code: %result%','pause','exit /b %result%');
  return lines.join('\\r\\n')+'\\r\\n';
 }
