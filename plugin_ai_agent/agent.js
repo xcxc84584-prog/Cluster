@@ -31,26 +31,25 @@ const explorerTools=Object.freeze({
   const roots=api.roots;
   const segments=String(args.path||'').split('/').filter(Boolean);
   if(name==='cluster.list_roots'){message((lang()==='zh'?'查詢 Explorer 根目錄':'Listed Explorer roots'));return roots.map(n=>({name:n.name,kind:n.kind}));}
-  if(!segments.length||segments.some(x=>x==='.'||x==='..'||x.includes('\\')||x.includes('\\0')))throw Error('Invalid Explorer path');
+  if(!segments.length||segments.some(x=>x==='.'||x==='..'||x.includes('\\')||x.includes('\0')))throw Error('Invalid Explorer path');
   const root=roots.find(n=>n.name===segments[0]);
   if(!root)throw Error('Explorer root not found');
   let handle=root.handle;
   for(let i=1;i<segments.length;i++){
    if(handle.kind!=='directory')throw Error('Not a directory');
-   handle=i===segments.length-1&&name!=='cluster.list_directory'&&name!=='cluster.create_file'?await handle.getFileHandle(segments[i]):await handle.getDirectoryHandle(segments[i]);
+   handle=i===segments.length-1&&['cluster.read_path','cluster.write_path','cluster.delete_path'].includes(name)?await handle.getFileHandle(segments[i]):await handle.getDirectoryHandle(segments[i]);
   }
   const audit=(zh,en,kind='system')=>message('['+new Date().toLocaleTimeString()+'] '+tr(zh,en),kind);
   const check=async(write=false)=>{if(await handle.queryPermission?.({mode:write?'readwrite':'read'})!=='granted')throw Error('Explorer browser permission required; grant access in Explorer first');};
   
   if(name==='cluster.list_directory'){
    if(handle.kind!=='directory')throw Error('Not a directory');await check();
-   const items=[];for await(const h of handle.values()){if(h.name==='.cluster-explorer-order.json')continue;items.push({name:h.name,kind:h.kind});if(items.length>=500)break;}
-   audit('查詢目錄：'+args.path,'Listed directory: '+args.path);return {path:args.path,items,limit:500};
+   const items=[];for await(const h of handle.values()){if(h.name==='.cluster-explorer-order.json')continue;items.push({name:h.name,kind:h.kind});}
+   audit('查詢目錄：'+args.path,'Listed directory: '+args.path);return {path:args.path,items};
   }
   if(name==='cluster.read_path'){
-   if(handle.kind!=='file')throw Error('Not a file');await check();const f=await handle.getFile();if(f.size>65536)throw Error('Read limit 64 KiB');
-   const content=new TextDecoder('utf-8',{fatal:true}).decode(await f.arrayBuffer());
-   audit('讀取文件：'+args.path,'Read file: '+args.path);return {path:args.path,content,size:f.size,lastModified:f.lastModified};
+   if(handle.kind!=='file')throw Error('Not a file');await check();const f=await handle.getFile();const offset=Math.max(0,Math.trunc(Number(args.offset)||0));const length=Math.min(262144,Math.max(1,Math.trunc(Number(args.length)||65536)));const content=new TextDecoder('utf-8',{fatal:false}).decode(await f.slice(offset,offset+length).arrayBuffer());
+   audit('讀取文件：'+args.path,'Read file: '+args.path);return {path:args.path,content,size:f.size,lastModified:f.lastModified,offset,nextOffset:Math.min(f.size,offset+length),hasMore:offset+length<f.size};
   }
   if(name==='cluster.create_file'){
    if(handle.kind!=='directory')throw Error('Parent directory required');await check(true);
@@ -61,9 +60,9 @@ const explorerTools=Object.freeze({
   }
   if(name==='cluster.write_path'){
    if(handle.kind!=='file')throw Error('Not a file');await check(true);
-   const content=args.content;if(typeof content!=='string'||new TextEncoder().encode(content).length>65536)throw Error('Write limit 64 KiB');
-   const f=await handle.getFile();if(f.size>65536)throw Error('File too large');
-   new TextDecoder('utf-8',{fatal:true}).decode(await f.arrayBuffer());
+   const content=args.content;if(typeof content!=='string')throw Error('Text content required');
+   const f=await handle.getFile();if(!args.confirmFullReplace)throw Error('Explicit confirmFullReplace=true required');
+   if(f.size>0){const probe=await f.slice(0,Math.min(f.size,65536)).arrayBuffer();new TextDecoder('utf-8',{fatal:true}).decode(probe);}
    if(args.expectedLastModified!==f.lastModified)throw Error('File changed or expectedLastModified missing; read first');
    const w=await handle.createWritable();try{await w.write(content);await w.close();}catch(e){try{await w.abort()}catch{}throw e}
    audit('修改文件：'+args.path,'Updated file: '+args.path);api.emit('ai-write');return {updated:true,path:args.path};
