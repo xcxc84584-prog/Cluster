@@ -35,6 +35,10 @@ const explorerTools=Object.freeze({
   if(!segments.length||segments.some(x=>x==='.'||x==='..'||x.includes('\\')||x.includes('\0')))throw Error('Invalid Explorer path');
   const root=roots.find(n=>n.name===segments[0]);
   if(!root)throw Error('Explorer root not found');
+  const permission=window.ClusterAgentPermissions;
+  if(!permission)throw Error('AI Agent permission manager unavailable');
+  const scope=name==='cluster.list_directory'||name==='cluster.read_path'?'read':name==='cluster.create_file'||name==='cluster.write_path'?'write':name==='cluster.delete_path'?'delete':name==='cluster.powershell_request'?'powershell':null;
+  if(scope)permission.requireAccess(scope,root.name);
   let handle=root.handle;
   for(let i=1;i<segments.length;i++){
    if(handle.kind!=='directory')throw Error('Not a directory');
