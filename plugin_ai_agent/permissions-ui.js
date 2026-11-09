@@ -29,9 +29,9 @@ const scopes=['read','write','delete','powershell'];
 const policy={roots:Object.create(null),log:[]};
 const rootNames=()=>window.ClusterCEXP?.roots?.map(r=>r.name)||[];
 function record(action,root,result){policy.log.unshift({time:new Date().toLocaleString(),action,root,result});policy.log.length=Math.min(policy.log.length,100);if(active)render()}
-function allowed(name,root){return !!policy.roots[root]?.[name]}
+function allowed(name,root){return policy.roots[root]?.[name]??(name==='read'||name==='write')}
 function requireAccess(name,root){const ok=allowed(name,root);record(name,root,ok?'allow':'deny');if(!ok)throw Error('AI Agent permission denied: '+name+' @ '+root);return true}
-function setAccess(root,name,value){if(!rootNames().includes(root)||!scopes.includes(name))throw Error('Invalid permission scope');policy.roots[root]??={read:false,write:false,delete:false,powershell:false};policy.roots[root][name]=!!value;record('policy:'+name,root,value?'enabled':'disabled');}
+function setAccess(root,name,value){if(!rootNames().includes(root)||!scopes.includes(name))throw Error('Invalid permission scope');policy.roots[root]??={read:true,write:true,delete:false,powershell:false};policy.roots[root][name]=!!value;record('policy:'+name,root,value?'enabled':'disabled');}
 
 const lang=()=> $('uiLanguage')?.value==='en'?'en':'zh';
 const t=(zh,en)=>lang()==='zh'?zh:en;
@@ -68,7 +68,7 @@ function render(){
  }
 }
 if(section==='audit'){for(const event of policy.log.slice(0,40)){const row=document.createElement('div');row.className='cap-row';row.textContent=event.time+' · '+event.action+' · '+event.root+' · '+event.result;main.append(row)}}
-const note=document.createElement('div');note.className='cap-note';note.textContent=t('權限預設全部關閉，只在目前頁面工作階段生效。PowerShell 執行橋接尚未完成；開啟請求權限不代表允許執行命令。','All permissions default to off and apply only to this page session. PowerShell execution bridge is not implemented; allowing requests does not authorize command execution.');main.append(note);grid.append(side,main);page.append(head,grid);
+const note=document.createElement('div');note.className='cap-note';note.textContent=t('基礎讀取與修改權限預設開啟，刪除及 PowerShell 預設關閉；設定僅在目前頁面工作階段生效。PowerShell 執行橋接尚未完成；開啟請求權限不代表允許執行命令。','Read and write permissions default to on; delete and PowerShell default to off. Settings apply only to this page session. PowerShell execution bridge is not implemented; allowing requests does not authorize command execution.');main.append(note);grid.append(side,main);page.append(head,grid);
 }
 function deactivate(){active=false;page.hidden=true;tab.classList.remove('is-active')}
 function open(){opened=true;active=true;window.ClusterTerminal?.deactivate?.();window.ClusterAI?.deactivate?.();window.ClusterDevelopmentEnvironment?.deactivate?.();window.ClusterSyntaxPage?.deactivate?.();document.body.classList.remove('cluster-terminal-active','cluster-ai-active');for(const id of ['editorShell','empty','localRangeView','clusterBottomBar']){const el=$(id);if(el)el.hidden=true}document.querySelectorAll('#tabList .tab').forEach(x=>x.classList.remove('is-active'));if(!tabs.contains(tab))tabs.append(tab);tab.classList.add('is-active');page.hidden=false;window.ClusterTabOrder?.apply?.();$('fileMenu').hidden=true;render()}
