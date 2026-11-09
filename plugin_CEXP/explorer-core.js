@@ -62,11 +62,11 @@
  }
  async function reorder(n,target,before=true){if(n.parent!==target.parent)throw Error('REORDER_SAME_FOLDER_ONLY');const parent=n.parent;const items=parent?parent.children||[]:roots;const from=items.indexOf(n),to=items.indexOf(target);if(from<0||to<0||from===to)return;items.splice(from,1);const index=items.indexOf(target);items.splice(index+(before?0:1),0,n);try{if(parent)await setOrder(parent,items.map(x=>x.name));else await saveRoots();}catch(e){items.splice(items.indexOf(n),1);items.splice(from,0,n);emit('reorder-rollback');throw e;}emit('reorder');}
  // [FIX-OPT5-002] Reconcile rescanned entries by name/kind, retaining nested open state.
- async function expand(n,force=false){
+ async function expand(n,force=false,background=false){
   if(n.kind!=='directory')return;
   if(n.expanded&&!force){n.expanded=false;emit('collapse');return;}
   if(n.expanded&&n.children&&!force)return;
-  if(!await permission(n.handle,false,true))throw Error('需要授權資料夾存取權限');
+  if(!await permission(n.handle,false,!background)){if(background)return;throw Error('需要授權資料夾存取權限');}
   const previous=new Map((n.children||[]).map(x=>[x.kind+'\0'+x.name,x]));
   const items=[];
   for await(const h of n.handle.values()){
@@ -78,23 +78,24 @@
   }
   const order=await getOrder(n);const oldNames=(n.children||[]).map(x=>x.name);const preferred=order.length?order:oldNames;
   items.sort((a,b)=>{const ai=preferred.indexOf(a.name),bi=preferred.indexOf(b.name);if(ai>=0&&bi>=0)return ai-bi;if(ai>=0)return -1;if(bi>=0)return 1;return Number(b.kind==='directory')-Number(a.kind==='directory')||a.name.localeCompare(b.name);});
-  const changed=!n.expanded||items.length!==(n.children||[]).length||items.some((item,i)=>item!==(n.children||[])[i]);\n  n.children=items;n.expanded=true;if(changed)emit('expand');
+  const changed=!n.expanded||items.length!==(n.children||[]).length||items.some((item,i)=>item!==(n.children||[])[i]);
+  n.children=items;n.expanded=true;if(changed)emit('expand');
  }
  // [FIX-OPT6-001] Snapshot every expanded descendant before refreshing; reconcile by path.
  // Refresh never collapses a folder unless it has actually been removed from disk.
- async function refreshExpanded(n){
+ async function refreshExpanded(n,background=false){
   if(n.kind!=='directory')return;
   const expanded=[];
   function remember(item,path=[]){if(item.kind!=='directory'||!item.expanded)return;expanded.push(path);for(const child of item.children||[])remember(child,[...path,child.name]);}
   remember(n);
   if(!expanded.length)return;
-  await expand(n,true);
+  await expand(n,true,background);
   for(const path of expanded.slice(1).sort((a,b)=>a.length-b.length)){
    let cur=n;
    for(const segment of path){cur=(cur.children||[]).find(x=>x.kind==='directory'&&x.name===segment);if(!cur)break;}
-   if(cur&&cur.kind==='directory')await expand(cur,true);
+   if(cur&&cur.kind==='directory')await expand(cur,true,background);
   }
-  emit('refresh-complete');
+  if(!background)emit('refresh-complete');
  }
  // Refresh expanded Explorer folders after changes made by Windows, PowerShell, or other programs.
  // Never prompt for permissions during background checks. Only one scan may run at a time.
@@ -106,7 +107,7 @@
    for(const root of [...roots]){
     if(root.kind!=='directory'||!root.expanded)continue;
     try{
-     if(await permission(root.handle,false,false))await refreshExpanded(root);
+     if(await permission(root.handle,false,false))await refreshExpanded(root,true);
     }catch(e){if(e?.name!=='NotFoundError'&&e?.name!=='NotAllowedError')console.warn('[Cluster Explorer] external refresh',e)}
    }
   }finally{externalScanBusy=false}
