@@ -106,7 +106,7 @@ wss.on('connection',ws=>{
       if(typeof command!=='string'||!command.trim()||command.length>2000){gatewayResponse(pending.res,422,{error:'Invalid approved command'});return;}
       runApprovedPowerShell(m.requestId,command).then(result=>{send(browserBridge,{type:'powershell_execution_result',command,result});gatewayResponse(pending.res,200,{result});}).catch(e=>{send(browserBridge,{type:'powershell_execution_result',command,error:e.message});gatewayResponse(pending.res,422,{error:e.message});});return;
      }
-     if(pending.name==='cluster.get_root_windows_path'&&!m.error){const name=String(m.result?.root||'');const dir=registeredRootPaths.get(name);gatewayResponse(pending.res,200,{result:{root:name,absolutePath:dir||null,verified:!!dir,reason:dir?null:'ROOT_PATH_NOT_REGISTERED',verification:'Windows path exists and basename matches Explorer root; handle identity not independently verified'}});return;}
+     if(pending.name==='cluster.get_root_windows_path'&&!m.error){const name=String(m.result?.root||'');const dir=registeredRootPaths.get(name);gatewayResponse(pending.res,200,{result:{root:name,absolutePath:dir||null,verified:false,registered:!!dir,reason:dir?'HANDLE_IDENTITY_NOT_VERIFIED':'ROOT_PATH_NOT_REGISTERED',verification:'Windows path exists and basename matches Explorer root; handle identity not independently verified'}});return;}
      gatewayResponse(pending.res,m.error?422:200,m.error?{error:String(m.error).slice(0,300)}:{result:m.result});return;}
     if(m.type==='provider_get'){const p=readProvider();send(ws,{type:'provider_info',configured:!!p.apiKey,model:p.model});return;}
     if(m.type==='provider_set'){
