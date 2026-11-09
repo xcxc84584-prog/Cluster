@@ -29,7 +29,7 @@ const scopes=['read','write','delete','powershell'];
 const policy={roots:Object.create(null),log:[]};
 const rootNames=()=>window.ClusterCEXP?.roots?.map(r=>r.name)||[];
 function record(action,root,result){policy.log.unshift({time:new Date().toLocaleString(),action,root,result});policy.log.length=Math.min(policy.log.length,100);if(active)render()}
-function allowed(name,root){return policy.roots[root]?.[name]??(name==='read'||name==='write')}
+function allowed(name,root){return (policy.roots[root]?.[name] ?? true)??(name==='read'||name==='write')}
 function requireAccess(name,root){const ok=allowed(name,root);record(name,root,ok?'allow':'deny');if(!ok)throw Error('AI Agent permission denied: '+name+' @ '+root);return true}
 function setAccess(root,name,value){if(!rootNames().includes(root)||!scopes.includes(name))throw Error('Invalid permission scope');policy.roots[root]??={read:true,write:true,delete:false,powershell:false};policy.roots[root][name]=!!value;record('policy:'+name,root,value?'enabled':'disabled');}
 
