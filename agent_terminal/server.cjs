@@ -98,7 +98,7 @@ wss.on('connection',ws=>{
       if(sessions.size===0){gatewayResponse(pending.res,403,{error:'POWERSHELL_WINDOW_REQUIRED: Open a PowerShell session in Cluster first'});return;}
       const command=pending.command;
       if(typeof command!=='string'||!command.trim()||command.length>2000){gatewayResponse(pending.res,422,{error:'Invalid approved command'});return;}
-      runApprovedPowerShell(m.requestId,command).then(result=>gatewayResponse(pending.res,200,{result})).catch(e=>gatewayResponse(pending.res,422,{error:e.message}));return;
+      runApprovedPowerShell(m.requestId,command).then(result=>{send(browserBridge,{type:'powershell_execution_result',command,result});gatewayResponse(pending.res,200,{result});}).catch(e=>{send(browserBridge,{type:'powershell_execution_result',command,error:e.message});gatewayResponse(pending.res,422,{error:e.message});});return;
      }
      gatewayResponse(pending.res,m.error?422:200,m.error?{error:String(m.error).slice(0,300)}:{result:m.result});return;}
     if(m.type==='provider_get'){const p=readProvider();send(ws,{type:'provider_info',configured:!!p.apiKey,model:p.model});return;}
