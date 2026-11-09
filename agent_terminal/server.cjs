@@ -95,6 +95,7 @@ wss.on('connection',ws=>{
     if(m.type==='bridge_register'){browserBridge=ws;send(ws,{type:'bridge_registered'});return;}
     if(m.type==='tool_result'){const pending=pendingTools.get(m.requestId);if(!pending||ws!==browserBridge)return;pendingTools.delete(m.requestId);clearTimeout(pending.timer);
      if(pending.name==='cluster.powershell_request'&&!m.error&&m.result?.approved===true){
+      if(sessions.size===0){gatewayResponse(pending.res,403,{error:'POWERSHELL_WINDOW_REQUIRED: Open a PowerShell session in Cluster first'});return;}
       const command=pending.command;
       if(typeof command!=='string'||!command.trim()||command.length>2000){gatewayResponse(pending.res,422,{error:'Invalid approved command'});return;}
       runApprovedPowerShell(m.requestId,command).then(result=>gatewayResponse(pending.res,200,{result})).catch(e=>gatewayResponse(pending.res,422,{error:e.message}));return;
