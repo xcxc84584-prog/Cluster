@@ -5,8 +5,36 @@ $origin='https://xcxc84584-prog.github.io'
 $source=Split-Path -Parent $MyInvocation.MyCommand.Path
 $target=Join-Path $env:LOCALAPPDATA 'ClusterTerminalAgent\app'
 $config=Join-Path $env:LOCALAPPDATA 'ClusterTerminalAgent'
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'Node.js 20+ is required: https://nodejs.org/en/download' }
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { throw 'npm is required. Install Node.js LTS.' }
+# Automatically provision Node.js LTS when missing or below the supported major version.
+function Resolve-Node {
+ $cmd=Get-Command node.exe -ErrorAction SilentlyContinue
+ if($cmd -and $cmd.Source -and (Test-Path $cmd.Source)){return $cmd.Source}
+ foreach($path in @((Join-Path $env:ProgramFiles 'nodejs\node.exe'),(Join-Path $env:LOCALAPPDATA 'Programs\nodejs\node.exe'))){
+  if(Test-Path $path){return $path}
+ }
+ return $null
+}
+function Get-NodeMajor($exe){
+ if(!$exe){return 0}
+ try { $v=(& $exe --version 2>$null);if($v -match '^v(\d+)\.'){return [int]$Matches[1]} }catch{}
+ return 0
+}
+$nodeExe=Resolve-Node
+if((Get-NodeMajor $nodeExe) -lt 20){
+ Write-Host 'Node.js 20+ not found. Installing Node.js LTS automatically...' -ForegroundColor Yellow
+ $winget=Get-Command winget.exe -ErrorAction SilentlyContinue
+ if(!$winget){throw 'Automatic Node.js installation requires Windows App Installer (winget). Install it from Microsoft Store, then retry.'}
+ & $winget.Source install --id OpenJS.NodeJS.LTS --exact --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity
+ if($LASTEXITCODE -ne 0){throw 'Node.js LTS installation failed. Check winget output above.'}
+ $env:Path=[Environment]::GetEnvironmentVariable('Path','Machine')+';'+[Environment]::GetEnvironmentVariable('Path','User')+';'+$env:Path
+ $nodeExe=Resolve-Node
+}
+if((Get-NodeMajor $nodeExe) -lt 20){throw 'Node.js 20+ is still unavailable after installation. Reopen terminal and retry.'}
+$nodeDir=Split-Path -Parent $nodeExe
+$env:Path=$nodeDir+';'+$env:Path
+$npmCmd=Join-Path $nodeDir 'npm.cmd'
+if(!(Test-Path $npmCmd)){throw 'npm.cmd missing from Node.js installation.'}
+Write-Host ('Node.js ready: '+(& $nodeExe --version)+' ('+$nodeExe+')') -ForegroundColor Green
 if (-not (Test-Path (Join-Path $source 'server.cjs'))) { throw 'Installer must be next to server.cjs.' }
 New-Item -ItemType Directory -Force -Path $config,$target | Out-Null
 # Existing agent must be stopped before updating executable files.
@@ -35,7 +63,7 @@ $items=@('server.cjs','remote-mcp.cjs','mcp-stdio.cjs','start-remote-mcp.cmd','p
 foreach($item in $items){Copy-Item -LiteralPath (Join-Path $source $item) -Destination (Join-Path $target $item) -Force}
 $origin | Set-Content -LiteralPath (Join-Path $config 'origin.txt') -Encoding ascii
 Push-Location $target
-try { & npm install --omit=dev; if($LASTEXITCODE -ne 0){throw 'npm install failed'} } finally {Pop-Location}
+try { & $npmCmd install --omit=dev; if($LASTEXITCODE -ne 0){throw 'npm install failed'} } finally {Pop-Location}
 $startup=[Environment]::GetFolderPath('Startup')
 $shortcut=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $startup 'Cluster Terminal Agent.lnk'))
 $shortcut.TargetPath=Join-Path $env:SystemRoot 'System32\wscript.exe'
