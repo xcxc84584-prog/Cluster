@@ -38,7 +38,7 @@ function runApprovedPowerShell(requestId,command){
  return new Promise((resolve,reject)=>{
   const exe=process.env.SystemRoot?path.join(process.env.SystemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe'):'powershell.exe';
   const encoded=Buffer.from(command,'utf16le').toString('base64');
-  const child=spawn(exe,['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',encoded],{cwd:'C:\\\\',windowsHide:true,stdio:['ignore','pipe','pipe']});
+  const child=spawn(exe,['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',encoded],{cwd:path.parse(process.env.SystemRoot||process.cwd()).root,windowsHide:true,stdio:['ignore','pipe','pipe']});
   powershellJobs.set(requestId,child);
   let stdout='',stderr='',bytes=0,finished=false;
   const timeout=setTimeout(()=>{child.kill();},15000);
