@@ -58,7 +58,7 @@ const server=http.createServer((req,res)=>{
   req.on('end',()=>{let m;try{m=JSON.parse(raw)}catch{gatewayResponse(res,400,{error:'Invalid JSON'});return;}
    if(!['cluster.list_files','cluster.read_file','cluster.get_editor_state','cluster.list_roots','cluster.list_directory','cluster.read_path','cluster.create_file','cluster.write_path','cluster.delete_path','cluster.powershell_request'].includes(m.name)){gatewayResponse(res,400,{error:'Unknown tool'});return;}
    if(!browserBridge||browserBridge.readyState!==1){gatewayResponse(res,503,{error:'Cluster browser bridge disconnected'});return;}
-   const requestId=crypto.randomUUID();const timer=setTimeout(()=>{pendingTools.delete(requestId);gatewayResponse(res,504,{error:'Browser bridge timeout'});},30000);
+   const requestId=crypto.randomUUID();const timer=setTimeout(()=>{pendingTools.delete(requestId);gatewayResponse(res,504,{error:'Browser bridge timeout'});},125000);
    pendingTools.set(requestId,{res,timer,name:m.name,command:m.name==='cluster.powershell_request'?m.arguments?.command:null});
    send(browserBridge,{type:'tool_call',requestId,name:m.name,args:m.arguments||{}});
   });return;
