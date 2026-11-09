@@ -30,6 +30,19 @@ const explorerTools=Object.freeze({
   const api=window.ClusterCEXP;if(!api)throw Error('Explorer unavailable');
   const tr=(zh,en)=>lang()==='zh'?zh:en;
   const roots=api.roots;
+  if(name==='cluster.powershell_request'){
+   const permission=window.ClusterAgentPermissions;
+   if(!permission)throw Error('AI Agent permission manager unavailable');
+   const selected=String(args.path||'').split('/').filter(Boolean)[0];
+   const root=window.ClusterCEXP?.roots?.find(n=>n.name===selected);
+   if(!root)throw Error('Specify an authorized Explorer workspace in path');
+   permission.requireAccess('powershell',root.name);
+   const command=String(args.command||'');
+   if(!command.trim()||command.length>2000)throw Error('Invalid command');
+   const allowed=window.confirm((lang()==='zh'?'PowerShell 將以目前 Windows 使用者權限執行，並非限制在工作區內。':'PowerShell runs as your Windows user and is NOT confined to the workspace.')+'\n'+(lang()==='zh'?'工作區：':'Workspace: ')+root.name+'\n'+command+'\n'+(lang()==='zh'?'確認執行？':'Execute this command?'));
+   if(!allowed)throw Error('User denied PowerShell');
+   return {approved:true};
+  }
   const segments=String(args.path||'').split('/').filter(Boolean);
   if(name==='cluster.list_roots'){message((lang()==='zh'?'查詢 Explorer 根目錄':'Listed Explorer roots'));return roots.map(n=>({name:n.name,kind:n.kind}));}
   if(!segments.length||segments.some(x=>x==='.'||x==='..'||x.includes('\\')||x.includes('\0')))throw Error('Invalid Explorer path');
