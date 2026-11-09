@@ -1,13 +1,14 @@
 /* [ADD-PR18] CEXP LINK adapter; no host-internal imports. */
 (()=>{'use strict';const fm=window.cluster.fm;
  const detail=d=>({docId:d.id,handle:d.handle,name:d.name});
+ function activateEditor(){for(const key of ['ClusterTerminal','ClusterAI','ClusterAgentPermissions','ClusterDevelopmentEnvironment','ClusterSyntaxPage'])window[key]?.deactivate?.();document.body.classList.remove('cluster-terminal-active','cluster-ai-active');for(const id of ['localRangeView']){const el=document.getElementById(id);if(el)el.hidden=true}}
  const opening=new Map();const handleKey=async h=>h;
  async function sameHandle(a,b){if(a===b)return true;if(!a||!b)return false;try{return !!(await a.isSameEntry(b))}catch{return false}}
  async function findOpen(h){for(const d of fm.docs)if(await sameHandle(d.handle,h))return d;return null}
 
  window.ClusterExplorerHost={
-  openHandle:async h=>{const existing=await findOpen(h);if(existing){window.ClusterTerminal?.deactivate?.();fm.select(existing.id);return existing}const key=await handleKey(h);if(opening.has(key))return opening.get(key);const task=(async()=>{const prior=await findOpen(h);if(prior){window.ClusterTerminal?.deactivate?.();fm.select(prior.id);return prior}window.ClusterTerminal?.deactivate?.();return fm.open(await h.getFile(),h)})();opening.set(key,task);try{return await task}finally{opening.delete(key)}},
-  activateDraft:async id=>fm.select(id),
+  openHandle:async h=>{const existing=await findOpen(h);if(existing){activateEditor();fm.select(existing.id);return existing}const key=await handleKey(h);if(opening.has(key))return opening.get(key);const task=(async()=>{const prior=await findOpen(h);if(prior){activateEditor();fm.select(prior.id);return prior}activateEditor();return fm.open(await h.getFile(),h)})();opening.set(key,task);try{return await task}finally{opening.delete(key)}},
+  activateDraft:async id=>{activateEditor();return fm.select(id)},
   getOpenDocuments:()=>fm.docs.map(detail)
  };
  // [FIX-OPT11-001] LINK owns tab lifecycle; Explorer never edits BASE DOM.
