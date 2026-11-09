@@ -2,6 +2,12 @@ $ErrorActionPreference='Stop'
 Write-Host 'Cluster MCP HTTPS Tunnel' -ForegroundColor Cyan
 Write-Host 'This publishes the MCP endpoint through a temporary public HTTPS URL.' -ForegroundColor Yellow
 Write-Host 'The endpoint requires a separate bearer token. Do not share it.'
+$updater=Join-Path $env:TEMP ('Cluster-MCP-Update-'+[guid]::NewGuid().ToString('N')+'.ps1')
+try {
+ Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/main/tools/mcp/Update-Cluster-MCP.ps1' -OutFile $updater -ErrorAction Stop
+ & $updater
+ if(-not $?){throw 'MCP component update failed'}
+} finally {Remove-Item -LiteralPath $updater -Force -ErrorAction SilentlyContinue}
 $base=Join-Path $env:LOCALAPPDATA 'ClusterTerminalAgent'
 $app=Join-Path $base 'app'
 $launcher=Join-Path $app 'start-remote-mcp.cmd'
