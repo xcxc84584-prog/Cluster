@@ -26,50 +26,43 @@ const page=document.createElement('section');page.id='clusterAgentPermissions';p
 const tab=document.createElement('div');tab.className='tab';tab.dataset.tabKey='tool:agent-permissions';const select=document.createElement('button');select.className='tab-select';select.onclick=open;const closeButton=document.createElement('button');closeButton.className='tab-close';closeButton.textContent='×';closeButton.onclick=close;tab.append(select,closeButton);
 let opened=false,active=false,section='overview';
 const scopes=['read','write','delete','powershell'];
-const policy={roots:Object.create(null),log:[],allowAllPowerShell:false};
-const rootNames=()=>window.ClusterCEXP?.roots?.map(r=>r.name)||[];
-function record(action,root,result){policy.log.unshift({time:new Date().toLocaleString(),action,root,result});policy.log.length=Math.min(policy.log.length,100);if(active)render()}
-function allowed(name,root){return (policy.roots[root]?.[name] ?? true)??(name==='read'||name==='write')}
-function requireAccess(name,root){const ok=allowed(name,root);record(name,root,ok?'allow':'deny');if(!ok)throw Error('AI Agent permission denied: '+name+' @ '+root);return true}
-function setAccess(root,name,value){if(!rootNames().includes(root)||!scopes.includes(name))throw Error('Invalid permission scope');policy.roots[root]??={read:true,write:true,delete:false,powershell:false};policy.roots[root][name]=!!value;record('policy:'+name,root,value?'enabled':'disabled');}
-
+const policy={read:true,write:true,delete:false,powershell:false,allowAllPowerShell:false,log:[]};
+function record(action,root,result){policy.log.unshift({time:new Date().toLocaleString(),action,root:root||'workspace',result});policy.log.length=Math.min(policy.log.length,200);if(active)render()}
+function allowed(name){return policy[name]===true}
+function requireAccess(name,root){const ok=allowed(name);record(name,root,ok?'allow':'deny');if(!ok)throw Error('AI Agent workspace permission denied: '+name);return true}
 const lang=()=> $('uiLanguage')?.value==='en'?'en':'zh';
 const t=(zh,en)=>lang()==='zh'?zh:en;
-const pages=[['overview','總覽','Overview'],['workspace','工作區','Workspaces'],['files','檔案存取','File Access'],['terminal','PowerShell 執行','PowerShell Execution'],['audit','操作紀錄','Audit Log']];
 function render(){
- select.textContent='◇ '+t('AI AGENT權限管理','AI Agent Permissions');
- button.querySelector('.cluster-tool-text').textContent=t('AI AGENT權限管理','AI Agent Permissions');
- const data={
- overview:[['工作區授權','Workspace authorization','尚未設定','Not configured'],['檔案讀寫','File read / write','尚未設定','Not configured'],['PowerShell 執行','PowerShell execution','未啟用','Disabled']],
- workspace:[['已授權工作區','Authorized workspaces','尚未設定','Not configured'],['路徑映射','Path mapping','尚未設定','Not configured']],
- files:[['讀取檔案','Read files','尚未設定','Not configured'],['建立及修改','Create and modify','尚未設定','Not configured'],['刪除檔案','Delete files','尚未設定','Not configured']],
- terminal:[['命令執行','Command execution','未啟用','Disabled'],['執行前確認','Pre-execution approval','尚未設定','Not configured']],
- audit:[['審計事件','Audit events','尚未連接','Not connected']]
- };
- page.innerHTML='';
+ select.textContent='◇ '+t('AI AGENT 權限管理','AI Agent Permissions');
+ const buttonText=button.querySelector('.cluster-tool-text');if(buttonText)buttonText.textContent=t('AI AGENT 權限管理','AI Agent Permissions');
+ page.replaceChildren();
  const head=document.createElement('div');head.className='cap-head';
- head.innerHTML='<div><div class="cap-eyebrow">CLUSTER / SECURITY CENTER</div><h2 class="cap-title"></h2><div class="cap-sub"></div></div><span class="cap-pill">UI PREVIEW · BASE</span>';
- head.querySelector('.cap-pill').textContent='SESSION POLICY · BASE';head.querySelector('h2').textContent=t('AI AGENT 權限管理','AI Agent Permission Management');
- head.querySelector('.cap-sub').textContent=t('工作區、檔案與終端權限的統一管理介面','Unified workspace, file and terminal permission management');
- const grid=document.createElement('div');grid.className='cap-grid';const side=document.createElement('div');side.className='cap-card cap-nav';
- for(const [id,zh,en] of pages){const b=document.createElement('button');b.textContent=t(zh,en);b.className=id===section?'active':'';b.onclick=()=>{section=id;render()};side.append(b)}
- const main=document.createElement('div');main.className='cap-card';const heading=document.createElement('h3');heading.textContent=t(...pages.find(p=>p[0]===section).slice(1));main.append(heading);
- for(const [zh,en,zs,es] of data[section]){const row=document.createElement('div');row.className='cap-row';const label=document.createElement('div');const strong=document.createElement('strong');strong.textContent=t(zh,en);const small=document.createElement('small');small.textContent=t('權限控制預留接口 · 尚未連接執行橋接','Reserved permission interface · execution bridge not connected');label.append(strong,small);const state=document.createElement('span');state.className='cap-state';state.textContent=t(zs,es);row.append(label,state);main.append(row)}
- if(section==='terminal'){const row=document.createElement('label');row.className='cap-row';const label=document.createElement('span');label.textContent=t('許可全部 PowerShell 命令（僅本次網頁工作階段）','Allow all PowerShell commands (this browser session only)');const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=policy.allowAllPowerShell;toggle.onchange=()=>{if(toggle.checked&&!window.confirm(t('此選項允許 AI Agent 在本次工作階段不逐次確認執行任意 PowerShell 命令，且具備目前 Windows 使用者權限。確定啟用？','This lets the AI Agent run any PowerShell command without individual approval for this session, with your Windows user privileges. Enable?'))){toggle.checked=false;return}policy.allowAllPowerShell=toggle.checked;record('allowAllPowerShell','session',toggle.checked?'enabled':'disabled');render()};row.append(label,toggle);main.append(row)}
- if(section==='workspace'||section==='files'||section==='terminal'){
- const roots=rootNames();
- if(!roots.length){const empty=document.createElement('p');empty.className='cap-note';empty.textContent=t('請先在 Explorer 加入工作區，才能設定權限。','Add a workspace in Explorer before configuring permissions.');main.append(empty)}
- for(const root of roots){
-  const title=document.createElement('h3');title.textContent='▣ '+root;title.style.marginTop='18px';main.append(title);
-  const names=section==='terminal'?['powershell']:section==='files'?['read','write','delete']:scopes;
-  for(const name of names){
-   const row=document.createElement('label');row.className='cap-row';const label=document.createElement('span');label.textContent=({read:t('讀取','Read'),write:t('建立及修改','Create and modify'),delete:t('刪除','Delete'),powershell:t('PowerShell 請求','PowerShell requests')})[name];
-   const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=allowed(name,root);toggle.onchange=()=>{setAccess(root,name,toggle.checked);render()};row.append(label,toggle);main.append(row)
-  }
+ const heading=document.createElement('div');heading.innerHTML='<div class="cap-eyebrow">CLUSTER / SECURITY CENTER</div>';
+ const title=document.createElement('h2');title.className='cap-title';title.textContent=t('工作區','Workspace');
+ const sub=document.createElement('div');sub.className='cap-sub';sub.textContent=t('統一管理 AI Agent 的檔案 CRUD 與 PowerShell 權限，不依專案區分','Manage AI Agent file CRUD and PowerShell permissions globally, without per-project policies');
+ heading.append(title,sub);head.append(heading);page.append(head);
+ const main=document.createElement('div');main.className='cap-card';main.style.maxWidth='900px';
+ const fields=[
+ ['read','讀取檔案','Read files'],
+ ['write','建立與修改檔案','Create and modify files'],
+ ['delete','刪除檔案','Delete files'],
+ ['powershell','PowerShell 執行','PowerShell execution'],
+ ['allowAllPowerShell','許可全部 PowerShell 命令（本次頁面工作階段）','Allow all PowerShell commands (current page session)']
+ ];
+ for(const [key,zh,en] of fields){
+  const row=document.createElement('label');row.className='cap-row';
+  const label=document.createElement('span');label.textContent=t(zh,en);
+  const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=policy[key];
+  toggle.onchange=()=>{
+   if(key==='allowAllPowerShell'&&toggle.checked&&!confirm(t('這將允許 AI Agent 不逐次確認執行 PowerShell 命令。是否開啟？','Allow AI Agent to run PowerShell commands without per-command approval?'))){toggle.checked=false;return}
+   policy[key]=toggle.checked;record('policy:'+key,'workspace',toggle.checked?'enabled':'disabled');render();
+  };
+  row.append(label,toggle);main.append(row);
  }
-}
-if(section==='audit'){for(const event of policy.log.slice(0,40)){const row=document.createElement('div');row.className='cap-row';row.textContent=event.time+' · '+event.action+' · '+event.root+' · '+event.result;main.append(row)}}
-const note=document.createElement('div');note.className='cap-note';note.textContent=t('基礎讀取與修改權限預設開啟，刪除及 PowerShell 預設關閉；設定僅在目前頁面工作階段生效。PowerShell 執行需先由使用者開啟終端工作階段；許可全部僅在目前頁面有效，關閉或重新載入後失效。','Read and write permissions default to on; delete and PowerShell default to off. Settings apply only to this page session. PowerShell requires a user-opened terminal session. Allow all applies only to this page and resets on reload.');main.append(note);grid.append(side,main);page.append(head,grid);
+ const note=document.createElement('p');note.className='cap-note';note.textContent=t('設定適用所有 Explorer ROOT；重新載入頁面後重設。PowerShell 自動建立視窗不代表取得命令執行權限。','Settings apply to all Explorer roots and reset on reload. Opening a PowerShell window does not grant execution permission.');main.append(note);
+ const auditTitle=document.createElement('h3');auditTitle.textContent=t('操作紀錄','Audit log');auditTitle.style.marginTop='22px';main.append(auditTitle);
+ for(const e of policy.log.slice(0,60)){const row=document.createElement('div');row.className='cap-row';row.textContent=e.time+' · '+e.action+' · '+e.root+' · '+e.result;main.append(row)}
+ page.append(main);
 }
 function deactivate(){active=false;page.hidden=true;tab.classList.remove('is-active')}
 function open(){opened=true;active=true;window.ClusterTerminal?.deactivate?.();window.ClusterAI?.deactivate?.();window.ClusterDevelopmentEnvironment?.deactivate?.();window.ClusterSyntaxPage?.deactivate?.();document.body.classList.remove('cluster-terminal-active','cluster-ai-active');for(const id of ['editorShell','empty','localRangeView','clusterBottomBar']){const el=$(id);if(el)el.hidden=true}document.querySelectorAll('#tabList .tab').forEach(x=>x.classList.remove('is-active'));if(!tabs.contains(tab))tabs.append(tab);tab.classList.add('is-active');page.hidden=false;window.ClusterTabOrder?.apply?.();$('fileMenu').hidden=true;render()}
@@ -77,6 +70,6 @@ function close(){const wasActive=active;opened=false;deactivate();tab.remove();i
 button.onclick=open;$('uiLanguage')?.addEventListener('change',render);window.cluster?.fm?.onChange?.(()=>{if(opened&&!tabs.contains(tab))tabs.append(tab);if(active){deactivate();}});
 tabs.addEventListener('click',event=>{if(active&&event.target.closest('.tab-select')&&!tab.contains(event.target)){deactivate()}},true);
 document.addEventListener('click',event=>{if(active&&event.target.closest('#syntaxOpenPage,#developmentOpenPage,#clusterAiOpen,#terminalOpen'))deactivate()},true);
-window.ClusterAgentPermissions={open,close,deactivate,isActive:()=>active,render,allowAllPowerShell:()=>policy.allowAllPowerShell,allowed,requireAccess,record,rootNames};
+window.ClusterAgentPermissions={open,close,deactivate,isActive:()=>active,render,allowAllPowerShell:()=>policy.allowAllPowerShell,allowed,requireAccess,record,rootNames:()=>window.ClusterCEXP?.roots?.map(r=>r.name)||[]};
 render();
 })();
