@@ -1,8 +1,9 @@
 @echo off
 setlocal
 set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
-echo Cluster Terminal Agent - one-time setup
+echo Cluster Terminal Agent - v20261109-auto-node-1
  echo This will download the public Cluster repository and install a local PowerShell agent.
+echo Node.js LTS will be installed automatically via winget if required.
 echo Review source code at https://github.com/xcxc84584-prog/Cluster before proceeding.
 choice /M "Proceed with installation"
 if errorlevel 2 exit /b 1
