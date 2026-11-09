@@ -39,7 +39,7 @@ const explorerTools=Object.freeze({
    permission.requireAccess('powershell',root.name);
    const command=String(args.command||'');
    if(!command.trim()||command.length>2000)throw Error('Invalid command');
-   if(!window.ClusterTerminal?.hasSession?.()){message(tr('請先點擊 PowerShell 按鈕並開啟終端工作階段，再重新提交命令。','Open a PowerShell session using the PowerShell button, then retry the command.'),'error');throw Error('POWERSHELL_WINDOW_REQUIRED: Open PowerShell from its button before AI execution');}
+   if(!window.ClusterTerminal?.hasSession?.()){message(tr('AI Agent 正在開啟 PowerShell 視窗；請確認本地連線。','AI Agent is opening a PowerShell window; check the local connection.'));await window.ClusterTerminal?.openForAgent?.();throw Error('POWERSHELL_WINDOW_OPENING: PowerShell window requested. Retry when the terminal session is ready.');}
    const allowed=permission.allowAllPowerShell?.()===true?true:await new Promise(resolve=>{
     const overlay=document.createElement('div');overlay.className='cluster-ps-approval';overlay.style.cssText='position:fixed;inset:0;z-index:2147483646;background:rgba(5,10,18,.8);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(5px)';
     const panel=document.createElement('section');panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.style.cssText='width:min(650px,100%);max-height:85vh;overflow:auto;background:linear-gradient(145deg,#171d29,#111722);color:#dce6f5;border:1px solid #31547e;border-radius:11px;padding:22px;box-shadow:0 18px 70px #000';
