@@ -40,7 +40,7 @@ const server=http.createServer((req,res)=>{
  if(req.method==='POST'&&route==='/mcp/call'){
   let raw='';req.on('data',chunk=>{raw+=chunk;if(raw.length>8192)req.destroy();});
   req.on('end',()=>{let m;try{m=JSON.parse(raw)}catch{gatewayResponse(res,400,{error:'Invalid JSON'});return;}
-   if(!['cluster.list_files','cluster.read_file','cluster.get_editor_state'].includes(m.name)){gatewayResponse(res,400,{error:'Unknown tool'});return;}
+   if(!['cluster.list_files','cluster.read_file','cluster.get_editor_state','cluster.list_roots','cluster.list_directory','cluster.read_path','cluster.create_file','cluster.write_path','cluster.delete_path','cluster.powershell_request'].includes(m.name)){gatewayResponse(res,400,{error:'Unknown tool'});return;}
    if(!browserBridge||browserBridge.readyState!==1){gatewayResponse(res,503,{error:'Cluster browser bridge disconnected'});return;}
    const requestId=crypto.randomUUID();const timer=setTimeout(()=>{pendingTools.delete(requestId);gatewayResponse(res,504,{error:'Browser bridge timeout'});},10000);
    pendingTools.set(requestId,{res,timer});
@@ -48,7 +48,7 @@ const server=http.createServer((req,res)=>{
   });return;
  }
  if(req.method!=='GET'||!['/mcp/status','/mcp/tasks'].includes(route)){gatewayResponse(res,404,{error:'Not Found'});return;}
- if(route==='/mcp/status')gatewayResponse(res,200,{connected:true,service:'Cluster Local Gateway',version:'p3.4-readonly',uptimeMs:Date.now()-gatewayStarted,activeTerminalSessions:sessions.size,capabilities:['cluster.get_status','cluster.get_task_status','cluster.list_files','cluster.read_file','cluster.get_editor_state'],browserEditorConnected:!!browserBridge&&browserBridge.readyState===1});
+ if(route==='/mcp/status')gatewayResponse(res,200,{connected:true,service:'Cluster Local Gateway',version:'p3.4-readonly',uptimeMs:Date.now()-gatewayStarted,activeTerminalSessions:sessions.size,capabilities:['cluster.get_status','cluster.get_task_status','cluster.list_files','cluster.read_file','cluster.get_editor_state','cluster.list_roots','cluster.list_directory','cluster.read_path','cluster.create_file','cluster.write_path','cluster.delete_path','cluster.powershell_request'],browserEditorConnected:!!browserBridge&&browserBridge.readyState===1});
  else gatewayResponse(res,200,{tasks:[...gatewayTasks.values()].slice(-50)});
 });
 const wss=new WebSocketServer({noServer:true,maxPayload:MAX_MESSAGE});
