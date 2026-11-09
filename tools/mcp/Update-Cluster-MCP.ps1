@@ -4,7 +4,31 @@ $ErrorActionPreference='Stop'
 $base=Join-Path $env:LOCALAPPDATA 'ClusterTerminalAgent'
 $app=Join-Path $base 'app'
 if(!(Test-Path $app)){throw 'Cluster Agent is not installed. Run Install-Cluster-Terminal.cmd first.'}
-$node=Get-Command node.exe -ErrorAction Stop
+function Find-Node {
+ $cmd=Get-Command node.exe -ErrorAction SilentlyContinue
+ if($cmd -and $cmd.Source -and (Test-Path -LiteralPath $cmd.Source)){return $cmd.Source}
+ foreach($candidate in @((Join-Path $env:ProgramFiles 'nodejs\node.exe'),(Join-Path $env:LOCALAPPDATA 'Programs\nodejs\node.exe'))){
+  if(Test-Path -LiteralPath $candidate){return $candidate}
+ }
+ return $null
+}
+function Test-NodeVersion($exe){
+ if(!$exe){return $false}
+ try {$v=& $exe --version 2>$null;return ($v -match '^v(\d+)\.' -and [int]$Matches[1] -ge 20)}catch{return $false}
+}
+$nodeExe=Find-Node
+if(!(Test-NodeVersion $nodeExe)){
+ Write-Host 'Node.js 20+ missing. Installing Node.js LTS via winget...' -ForegroundColor Yellow
+ $winget=Get-Command winget.exe -ErrorAction SilentlyContinue
+ if(!$winget){throw 'winget is unavailable. Install Windows App Installer, then retry Cluster MCP Setup.'}
+ & $winget.Source install --id OpenJS.NodeJS.LTS --exact --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity
+ if($LASTEXITCODE -ne 0){throw 'Node.js LTS installation failed. Review winget output.'}
+ $env:Path=[Environment]::GetEnvironmentVariable('Path','Machine')+';'+[Environment]::GetEnvironmentVariable('Path','User')+';'+$env:Path
+ $nodeExe=Find-Node
+}
+if(!(Test-NodeVersion $nodeExe)){throw 'Node.js 20+ still unavailable. Restart the terminal and retry.'}
+$env:Path=(Split-Path -Parent $nodeExe)+';'+$env:Path
+Write-Host ('Node.js ready: '+(& $nodeExe --version)) -ForegroundColor Green
 $files=@('server.cjs','remote-mcp.cjs','oauth-mcp-gateway.cjs')
 $staged=@()
 try {
@@ -12,7 +36,7 @@ try {
   $dest=Join-Path $app $name
   $temp=Join-Path $env:TEMP ('cluster-mcp-'+[guid]::NewGuid().ToString('N')+'-'+$name)
   Invoke-WebRequest -UseBasicParsing -Uri ('https://raw.githubusercontent.com/xcxc84584-prog/Cluster/main/agent_terminal/'+$name) -OutFile $temp -ErrorAction Stop
-  & $node.Source --check $temp
+  & $nodeExe --check $temp
   if($LASTEXITCODE -ne 0){throw ('Syntax check failed: '+$name)}
   $staged+=@{Name=$name;Dest=$dest;Temp=$temp}
  }
