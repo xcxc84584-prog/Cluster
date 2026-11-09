@@ -30,6 +30,13 @@ const explorerTools=Object.freeze({
   const api=window.ClusterCEXP;if(!api)throw Error('Explorer unavailable');
   const tr=(zh,en)=>lang()==='zh'?zh:en;
   const roots=api.roots;
+  if(name==='cluster.open_powershell'){
+   window.ClusterAgentPermissions?.requireAccess('powershell','workspace');
+   if(!window.ClusterTerminal?.openForAgent)throw Error('PowerShell terminal unavailable');
+   await window.ClusterTerminal.openForAgent();
+   message(tr('AI Agent 已要求開啟 PowerShell 視窗','AI Agent requested PowerShell window'));
+   return {requested:true,ready:!!window.ClusterTerminal.hasSession?.(),message:'PowerShell terminal opening; wait for session readiness before executing commands'};
+  }
   if(name==='cluster.powershell_request'){
    const permission=window.ClusterAgentPermissions;
    if(!permission)throw Error('AI Agent permission manager unavailable');
