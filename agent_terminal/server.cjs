@@ -56,7 +56,7 @@ const server=http.createServer((req,res)=>{
  if(req.method==='POST'&&route==='/mcp/call'){
   let raw='';req.on('data',chunk=>{raw+=chunk;if(raw.length>8192)req.destroy();});
   req.on('end',()=>{let m;try{m=JSON.parse(raw)}catch{gatewayResponse(res,400,{error:'Invalid JSON'});return;}
-   if(!['cluster.list_files','cluster.read_file','cluster.get_editor_state','cluster.list_roots','cluster.find_root_windows_path','cluster.list_directory','cluster.read_path','cluster.create_file','cluster.write_path','cluster.delete_path','cluster.powershell_request'].includes(m.name)){gatewayResponse(res,400,{error:'Unknown tool'});return;}
+   if(!['cluster.list_files','cluster.read_file','cluster.get_editor_state','cluster.list_roots','cluster.find_root_windows_path','cluster.list_directory','cluster.read_path','cluster.create_file','cluster.write_path','cluster.delete_path','cluster.powershell_request','cluster.open_powershell'].includes(m.name)){gatewayResponse(res,400,{error:'Unknown tool'});return;}
    if(m.name==='cluster.find_root_windows_path'){
     const name=String(m.arguments?.root||'');
     try{gatewayResponse(res,200,{result:{root:name,...locateRootCandidates(name),verified:false,reason:'CANDIDATES_REQUIRE_HANDLE_VERIFICATION'}})}catch(e){gatewayResponse(res,422,{error:e.message})}
