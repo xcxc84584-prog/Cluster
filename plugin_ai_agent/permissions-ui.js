@@ -26,7 +26,7 @@ const page=document.createElement('section');page.id='clusterAgentPermissions';p
 const tab=document.createElement('div');tab.className='tab';tab.dataset.tabKey='tool:agent-permissions';const select=document.createElement('button');select.className='tab-select';select.onclick=open;const closeButton=document.createElement('button');closeButton.className='tab-close';closeButton.textContent='×';closeButton.onclick=close;tab.append(select,closeButton);
 let opened=false,active=false,section='overview';
 const scopes=['read','write','delete','powershell'];
-const policy={roots:Object.create(null),log:[]};
+const policy={roots:Object.create(null),log:[],allowAllPowerShell:false};
 const rootNames=()=>window.ClusterCEXP?.roots?.map(r=>r.name)||[];
 function record(action,root,result){policy.log.unshift({time:new Date().toLocaleString(),action,root,result});policy.log.length=Math.min(policy.log.length,100);if(active)render()}
 function allowed(name,root){return (policy.roots[root]?.[name] ?? true)??(name==='read'||name==='write')}
@@ -55,6 +55,7 @@ function render(){
  for(const [id,zh,en] of pages){const b=document.createElement('button');b.textContent=t(zh,en);b.className=id===section?'active':'';b.onclick=()=>{section=id;render()};side.append(b)}
  const main=document.createElement('div');main.className='cap-card';const heading=document.createElement('h3');heading.textContent=t(...pages.find(p=>p[0]===section).slice(1));main.append(heading);
  for(const [zh,en,zs,es] of data[section]){const row=document.createElement('div');row.className='cap-row';const label=document.createElement('div');const strong=document.createElement('strong');strong.textContent=t(zh,en);const small=document.createElement('small');small.textContent=t('權限控制預留接口 · 尚未連接執行橋接','Reserved permission interface · execution bridge not connected');label.append(strong,small);const state=document.createElement('span');state.className='cap-state';state.textContent=t(zs,es);row.append(label,state);main.append(row)}
+ if(section==='terminal'){const row=document.createElement('label');row.className='cap-row';const label=document.createElement('span');label.textContent=t('許可全部 PowerShell 命令（僅本次網頁工作階段）','Allow all PowerShell commands (this browser session only)');const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=policy.allowAllPowerShell;toggle.onchange=()=>{if(toggle.checked&&!window.confirm(t('此選項允許 AI Agent 在本次工作階段不逐次確認執行任意 PowerShell 命令，且具備目前 Windows 使用者權限。確定啟用？','This lets the AI Agent run any PowerShell command without individual approval for this session, with your Windows user privileges. Enable?'))){toggle.checked=false;return}policy.allowAllPowerShell=toggle.checked;record('allowAllPowerShell','session',toggle.checked?'enabled':'disabled');render()};row.append(label,toggle);main.append(row)}
  if(section==='workspace'||section==='files'||section==='terminal'){
  const roots=rootNames();
  if(!roots.length){const empty=document.createElement('p');empty.className='cap-note';empty.textContent=t('請先在 Explorer 加入工作區，才能設定權限。','Add a workspace in Explorer before configuring permissions.');main.append(empty)}
@@ -68,7 +69,7 @@ function render(){
  }
 }
 if(section==='audit'){for(const event of policy.log.slice(0,40)){const row=document.createElement('div');row.className='cap-row';row.textContent=event.time+' · '+event.action+' · '+event.root+' · '+event.result;main.append(row)}}
-const note=document.createElement('div');note.className='cap-note';note.textContent=t('基礎讀取與修改權限預設開啟，刪除及 PowerShell 預設關閉；設定僅在目前頁面工作階段生效。PowerShell 執行橋接尚未完成；開啟請求權限不代表允許執行命令。','Read and write permissions default to on; delete and PowerShell default to off. Settings apply only to this page session. PowerShell execution bridge is not implemented; allowing requests does not authorize command execution.');main.append(note);grid.append(side,main);page.append(head,grid);
+const note=document.createElement('div');note.className='cap-note';note.textContent=t('基礎讀取與修改權限預設開啟，刪除及 PowerShell 預設關閉；設定僅在目前頁面工作階段生效。PowerShell 執行需先由使用者開啟終端工作階段；許可全部僅在目前頁面有效，關閉或重新載入後失效。','Read and write permissions default to on; delete and PowerShell default to off. Settings apply only to this page session. PowerShell requires a user-opened terminal session. Allow all applies only to this page and resets on reload.');main.append(note);grid.append(side,main);page.append(head,grid);
 }
 function deactivate(){active=false;page.hidden=true;tab.classList.remove('is-active')}
 function open(){opened=true;active=true;window.ClusterTerminal?.deactivate?.();window.ClusterAI?.deactivate?.();window.ClusterDevelopmentEnvironment?.deactivate?.();window.ClusterSyntaxPage?.deactivate?.();document.body.classList.remove('cluster-terminal-active','cluster-ai-active');for(const id of ['editorShell','empty','localRangeView','clusterBottomBar']){const el=$(id);if(el)el.hidden=true}document.querySelectorAll('#tabList .tab').forEach(x=>x.classList.remove('is-active'));if(!tabs.contains(tab))tabs.append(tab);tab.classList.add('is-active');page.hidden=false;window.ClusterTabOrder?.apply?.();$('fileMenu').hidden=true;render()}
@@ -76,6 +77,6 @@ function close(){const wasActive=active;opened=false;deactivate();tab.remove();i
 button.onclick=open;$('uiLanguage')?.addEventListener('change',render);window.cluster?.fm?.onChange?.(()=>{if(opened&&!tabs.contains(tab))tabs.append(tab);if(active){deactivate();}});
 tabs.addEventListener('click',event=>{if(active&&event.target.closest('.tab-select')&&!tab.contains(event.target)){deactivate()}},true);
 document.addEventListener('click',event=>{if(active&&event.target.closest('#syntaxOpenPage,#developmentOpenPage,#clusterAiOpen,#terminalOpen'))deactivate()},true);
-window.ClusterAgentPermissions={open,close,deactivate,isActive:()=>active,render,allowed,requireAccess,record,rootNames};
+window.ClusterAgentPermissions={open,close,deactivate,isActive:()=>active,render,allowAllPowerShell:()=>policy.allowAllPowerShell,allowed,requireAccess,record,rootNames};
 render();
 })();
