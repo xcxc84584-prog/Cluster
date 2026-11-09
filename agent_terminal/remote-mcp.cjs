@@ -31,7 +31,7 @@ const tools=[
  {name:'cluster.create_file',description:'Create an empty file in an authorized Explorer directory.',inputSchema:{type:'object',properties:{path:{type:'string'},name:{type:'string'}},required:['path','name'],additionalProperties:false}},
  {name:'cluster.write_path',description:'Replace a file with UTF-8 text only if expectedLastModified matches; full replacement requires confirmFullReplace=true. Large files should use an external streaming editor.',inputSchema:{type:'object',properties:{path:{type:'string'},content:{type:'string'},expectedLastModified:{type:'number'},confirmFullReplace:{type:'boolean',const:true}},required:['path','content','expectedLastModified','confirmFullReplace'],additionalProperties:false}},
  {name:'cluster.delete_path',description:'Request interactive user approval to delete one Explorer file.',inputSchema:{type:'object',properties:{path:{type:'string'}},required:['path'],additionalProperties:false}},
- {name:'cluster.powershell_request',description:'Request user authorization for a PowerShell command. Does not execute.',inputSchema:{type:'object',properties:{command:{type:'string'}},required:['command'],additionalProperties:false}}
+ {name:'cluster.powershell_request',description:'Execute a PowerShell command only after the Cluster browser explicitly confirms the exact command. Runs as the local signed-in user; not sandboxed.',inputSchema:{type:'object',properties:{command:{type:'string'}},required:['command'],additionalProperties:false}}
 ];
 const names=new Set(tools.map(x=>x.name));
 const maxBody=32768;
