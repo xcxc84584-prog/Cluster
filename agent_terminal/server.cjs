@@ -37,7 +37,8 @@ const powershellJobs=new Map();
 function runApprovedPowerShell(requestId,command){
  return new Promise((resolve,reject)=>{
   const exe=process.env.SystemRoot?path.join(process.env.SystemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe'):'powershell.exe';
-  const unicodePrefix='[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $OutputEncoding = [Console]::OutputEncoding; $ProgressPreference = \'SilentlyContinue\'; ';\n  const encoded=Buffer.from(unicodePrefix+command,'utf16le').toString('base64');
+  const unicodePrefix='[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $OutputEncoding = [Console]::OutputEncoding; $ProgressPreference = \'SilentlyContinue\'; ';
+  const encoded=Buffer.from(unicodePrefix+command,'utf16le').toString('base64');
   const child=spawn(exe,['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',encoded],{cwd:path.parse(process.env.SystemRoot||process.cwd()).root,windowsHide:true,stdio:['ignore','pipe','pipe']});
   powershellJobs.set(requestId,child);
   const {StringDecoder}=require('node:string_decoder');const stdoutDecoder=new StringDecoder('utf8'),stderrDecoder=new StringDecoder('utf8');\n  let stdout='',stderr='',bytes=0,finished=false;
