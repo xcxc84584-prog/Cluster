@@ -50,6 +50,30 @@ function script(p,kind){
  const needsNode=p[0]==='typescript';
  const needsArduino=arduinoDeps.includes(p[0]);
  const needsWinget=kind==='install'&&(/\bwinget\b/i.test(cmd)||needsPython||needsNode||needsArduino);
+ if(kind==='install'&&p[0]==='gcc'){
+  lines.push(
+   'if exist "C:\\msys64\\ucrt64\\bin\\g++.exe" goto gcc_verify',
+   'if exist "C:\\msys64\\usr\\bin\\bash.exe" goto gcc_upgrade',
+   'echo Installing MSYS2...',
+   'winget install --id MSYS2.MSYS2 -e --accept-package-agreements --accept-source-agreements',
+   'if errorlevel 1 goto failed',
+   ':gcc_upgrade',
+   'if not exist "C:\\msys64\\usr\\bin\\bash.exe" goto failed',
+   'echo Updating MSYS2 packages. If core upgrade terminates bash, run this installer again.',
+   '"C:\\msys64\\usr\\bin\\bash.exe" -lc "pacman -Syu --noconfirm"',
+   'if errorlevel 1 goto failed',
+   'echo Installing GCC/G++ UCRT64...',
+   '"C:\\msys64\\usr\\bin\\bash.exe" -lc "pacman -S --needed --noconfirm mingw-w64-ucrt-x86_64-gcc"',
+   'if errorlevel 1 goto failed',
+   ':gcc_verify',
+   '"C:\\msys64\\ucrt64\\bin\\g++.exe" --version',
+   'if errorlevel 1 goto failed',
+   'echo GCC installed. For this CMD session: set PATH=C:\\msys64\\ucrt64\\bin;%%PATH%%',
+   'goto success'
+  );
+  lines.push(':failed','echo Installation failed. Check MSYS2 mirror connectivity, close other MSYS2 sessions and retry.','pause','exit /b 1',':success','echo GCC / G++ ready.','pause','exit /b 0');
+  return lines.join('\r\n')+'\r\n';
+ }
  if(kind==='uninstall')lines.push('choice /C YN /M "Remove '+p[1]+'?"','if errorlevel 2 exit /b 2');
  if(needsWinget)lines.push('where winget >nul 2>&1 || (echo ERROR: winget unavailable. Install Windows App Installer from Microsoft Store. & goto failed)');
  if(kind==='install'&&needsPython){
