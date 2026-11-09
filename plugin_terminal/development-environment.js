@@ -39,19 +39,55 @@ panel.style.cssText='overflow:auto;padding:20px;background:#101116;color:#eee;po
 host.append(panel);
 const tab=document.createElement('div');tab.className='tab cluster-dev-tab';tab.dataset.tabKey='tool:development-environment';tab.style.display='none';const tabSelect=document.createElement('button');tabSelect.className='tab-select';const tabClose=document.createElement('button');tabClose.textContent='×';tab.append(tabSelect,tabClose);
 let active=false;
-function script(p,kind){const cmd=p[kind==='install'?3:kind==='uninstall'?4:5];const lines=['@echo off','setlocal','chcp 65001 >nul','echo Cluster: '+p[1]+' '+kind];if(kind==='uninstall')lines.push('choice /C YN /M "Remove '+p[1]+'?"','if errorlevel 2 exit /b 2');
-if(kind==='install'&&(p[0]==='esp32'||p[0]==='nano')){
- lines.push('where arduino-cli >nul 2>&1','if not errorlevel 1 goto arduino_ready',
- 'echo Arduino CLI is required. Installing via winget...',
- 'where winget >nul 2>&1 || (echo Windows App Installer / winget is required. & exit /b 1)',
- 'winget install --id ArduinoSA.CLI -e --accept-package-agreements --accept-source-agreements',
- 'if errorlevel 1 (echo Arduino CLI installation failed. & exit /b 1)',
- 'set "PATH=%LOCALAPPDATA%\\Microsoft\\WinGet\\Links;%ProgramFiles%\\Arduino CLI;%ProgramFiles%\\Arduino CLI\\bin;%PATH%"',
- ':arduino_ready',
- 'where arduino-cli >nul 2>&1 || (echo Arduino CLI not found after installation. Restart terminal and retry. & exit /b 1)',
- 'arduino-cli version','if errorlevel 1 exit /b 1');
+function script(p,kind){
+ const cmd=p[kind==='install'?3:kind==='uninstall'?4:5];
+ const lines=['@echo off','setlocal','chcp 65001 >nul','echo Cluster: '+p[1]+' '+kind];
+ const wingetPackages={python:'Python.Python.3.13',node:'OpenJS.NodeJS.LTS',arduino:'ArduinoSA.CLI'};
+ const pythonDeps=['pyserial','esptool','pytest','black','ruff','jupyter','platformio'];
+ const arduinoDeps=['nano','esp32'];
+ const needsPython=pythonDeps.includes(p[0]);
+ const needsNode=p[0]==='typescript';
+ const needsArduino=arduinoDeps.includes(p[0]);
+ const needsWinget=kind==='install'&&(/\\bwinget\\b/i.test(cmd)||needsPython||needsNode||needsArduino);
+ if(kind==='uninstall')lines.push('choice /C YN /M "Remove '+p[1]+'?"','if errorlevel 2 exit /b 2');
+ if(needsWinget)lines.push('where winget >nul 2>&1 || (echo ERROR: winget unavailable. Install Windows App Installer from Microsoft Store. & goto failed)');
+ if(kind==='install'&&needsPython){
+  lines.push('py -3.13 --version >nul 2>&1 && goto python_ready',
+   'echo Installing Python 3.13 prerequisite...',
+   'winget install --id '+wingetPackages.python+' -e --accept-package-agreements --accept-source-agreements',
+   'if errorlevel 1 goto failed',
+   'set "PATH=%LOCALAPPDATA%\\Microsoft\\WinGet\\Links;%LOCALAPPDATA%\\Programs\\Python\\Python313;%LOCALAPPDATA%\\Programs\\Python\\Python313\\Scripts;%PATH%"',
+   ':python_ready',
+   'py -3.13 --version >nul 2>&1 || (echo Python launcher not available. Reopen terminal and retry. & goto failed)');
+ }
+ if(kind==='install'&&needsNode){
+  lines.push('where npm.cmd >nul 2>&1 && goto node_ready',
+   'echo Installing Node.js LTS prerequisite...',
+   'winget install --id '+wingetPackages.node+' -e --accept-package-agreements --accept-source-agreements',
+   'if errorlevel 1 goto failed',
+   'set "PATH=%ProgramFiles%\\nodejs;%LOCALAPPDATA%\\Microsoft\\WinGet\\Links;%PATH%"',
+   ':node_ready',
+   'where npm.cmd >nul 2>&1 || (echo npm unavailable. Reopen terminal and retry. & goto failed)');
+ }
+ if(kind==='install'&&needsArduino){
+  lines.push('where arduino-cli >nul 2>&1 && goto arduino_ready',
+   'echo Installing Arduino CLI prerequisite...',
+   'winget install --id '+wingetPackages.arduino+' -e --accept-package-agreements --accept-source-agreements',
+   'if errorlevel 1 goto failed',
+   'set "PATH=%LOCALAPPDATA%\\Microsoft\\WinGet\\Links;%ProgramFiles%\\Arduino CLI;%ProgramFiles%\\Arduino CLI\\bin;%PATH%"',
+   ':arduino_ready',
+   'where arduino-cli >nul 2>&1 || (echo Arduino CLI unavailable. Reopen terminal and retry. & goto failed)');
+ }
+ if(kind==='install'&&needsPython){
+  lines.push('py -3.13 -m ensurepip --upgrade','if errorlevel 1 goto failed');
+ }
+ let run=cmd;
+ if(needsPython)run=cmd.replace(/\\bpy -m /g,'py -3.13 -m ');
+ if(p[0]==='typescript')run=cmd.replace(/\\bnpm /g,'npm.cmd ');
+ if(p[0]==='msys2'&&kind==='install')run='winget install --id MSYS2.MSYS2 -e --accept-package-agreements --accept-source-agreements && if exist "C:\\\\msys64\\\\usr\\\\bin\\\\bash.exe" ("C:\\\\msys64\\\\usr\\\\bin\\\\bash.exe" -lc "pacman -Sy --noconfirm mingw-w64-ucrt-x86_64-gcc") else (echo MSYS2 shell not found; reopen terminal and finish installation. & exit /b 1)';
+ lines.push(run,'if errorlevel 1 goto failed','echo Installation command completed.','set "result=0"','goto finish',':failed','echo Installation failed. Review prerequisites and command output.','set "result=1"',':finish','echo Exit code: %result%','pause','exit /b %result%');
+ return lines.join('\\r\\n')+'\\r\\n';
 }
-lines.push(cmd,'set "result=%errorlevel%"','echo Exit code: %result%','pause','exit /b %result%');return lines.join('\r\n')+'\r\n';}
 function download(p,kind){const blob=new Blob([script(p,kind)],{type:'application/octet-stream'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=p[0]+'-'+kind+'.cmd';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 const searchAliases={"python":"python py py3 pip venv","git":"git version control","node":"javascript js node npm web","cmake":"c cpp c++ cmake","ninja":"c cpp c++ build ninja","msys2":"c cpp c++ gcc g++ mingw compiler","java":"java jave jdk javac","arduino":"arduino c cpp embedded","nano":"arduino nano ble nrf52840 c cpp","esp32":"esp32 arduino c cpp","pyserial":"python serial uart","clang":"c cpp c++ clang llvm compiler","dotnet":"c# csharp dotnet asp.net","go":"golang go","rust":"rust rustlang cargo","powershell7":"powershell ps pwsh","gh":"github gh","vscode":"editor vscode ide","esptool":"esp32 esp8266 python esptool","pytest":"python testing pytest","black":"python formatter black","ruff":"python linter ruff","jupyter":"python notebook data science","platformio":"arduino esp32 embedded python platformio","docker":"container docker","typescript":"typescript ts javascript node","openocd":"openocd c cpp embedded jtag debug","postman":"api http postman"};
 const normalizedQuery=q=>q.toLowerCase().normalize('NFKC').trim();
