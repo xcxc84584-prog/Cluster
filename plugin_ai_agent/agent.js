@@ -39,17 +39,18 @@ const explorerTools=Object.freeze({
    permission.requireAccess('powershell',root.name);
    const command=String(args.command||'');
    if(!command.trim()||command.length>2000)throw Error('Invalid command');
-   const allowed=await new Promise(resolve=>{
-    const overlay=document.createElement('div');overlay.style.cssText='position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:20px';
-    const panel=document.createElement('section');panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.style.cssText='width:min(650px,100%);max-height:85vh;overflow:auto;background:#171e2b;color:#fff;border:1px solid #53627d;border-radius:12px;padding:22px;box-shadow:0 18px 70px #000';
-    const title=document.createElement('h3');title.textContent=tr('AI Agent：PowerShell 執行授權','AI Agent: PowerShell execution approval');
-    const note=document.createElement('p');note.textContent=tr('此命令將以目前 Windows 使用者身分執行，不受工作區沙盒限制。請核對完整命令。','This command runs as your Windows user, outside the workspace sandbox. Review it carefully.');
+   if(!window.ClusterTerminal?.wasUserOpened?.())throw Error('POWERSHELL_WINDOW_REQUIRED: Open PowerShell from its button before AI execution');
+   const allowed=permission.allowAllPowerShell?.()===true?true:await new Promise(resolve=>{
+    const overlay=document.createElement('div');overlay.className='cluster-ps-approval';overlay.style.cssText='position:fixed;inset:0;z-index:2147483646;background:rgba(5,10,18,.8);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(5px)';
+    const panel=document.createElement('section');panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.style.cssText='width:min(650px,100%);max-height:85vh;overflow:auto;background:linear-gradient(145deg,#171d29,#111722);color:#dce6f5;border:1px solid #31547e;border-radius:11px;padding:22px;box-shadow:0 18px 70px #000';
+    const title=document.createElement('h3');title.className='cap-title';title.textContent=tr('AI Agent：PowerShell 執行授權','AI Agent: PowerShell execution approval');
+    const note=document.createElement('p');note.className='cap-note';note.textContent=tr('此命令將以目前 Windows 使用者身分執行，不受工作區沙盒限制。請核對完整命令。','This command runs as your Windows user, outside the workspace sandbox. Review it carefully.');
     const workspace=document.createElement('p');workspace.textContent=tr('工作區：','Workspace: ')+root.name;
     const pre=document.createElement('pre');pre.textContent=command;pre.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;max-height:38vh;overflow:auto;background:#090e17;padding:12px;border-radius:6px';
     const actions=document.createElement('div');actions.style.cssText='display:flex;gap:12px;justify-content:flex-end;margin-top:18px';
     const deny=document.createElement('button');deny.type='button';deny.textContent=tr('拒絕','Deny');
     const approve=document.createElement('button');approve.type='button';approve.textContent=tr('授權並執行','Approve and execute');
-    approve.style.cssText='background:#2563eb;color:white;padding:9px 15px;border-radius:6px';deny.style.cssText='padding:9px 15px';
+    approve.style.cssText='background:#245a9b;border:1px solid #4278b5;color:white;padding:9px 15px;border-radius:6px';deny.style.cssText='padding:9px 15px';
     let finished=false;const done=value=>{if(finished)return;finished=true;clearTimeout(timer);overlay.remove();resolve(value)};
     const timer=setTimeout(()=>done(false),120000);
     approve.addEventListener('click',()=>done(true));deny.addEventListener('click',()=>done(false));
