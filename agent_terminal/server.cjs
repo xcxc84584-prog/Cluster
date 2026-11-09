@@ -59,7 +59,14 @@ const server=http.createServer((req,res)=>{
    if(!['cluster.list_files','cluster.read_file','cluster.get_editor_state','cluster.list_roots','cluster.find_root_windows_path','cluster.list_directory','cluster.read_path','cluster.create_file','cluster.write_path','cluster.delete_path','cluster.powershell_request','cluster.open_powershell'].includes(m.name)){gatewayResponse(res,400,{error:'Unknown tool'});return;}
    if(m.name==='cluster.find_root_windows_path'){
     const name=String(m.arguments?.root||'');
-    try{gatewayResponse(res,200,{result:{root:name,...locateRootCandidates(name),verified:false,reason:'CANDIDATES_REQUIRE_HANDLE_VERIFICATION'}})}catch(e){gatewayResponse(res,422,{error:e.message})}
+    try{
+     const found=locateRootCandidates(name);
+     if(!browserBridge||browserBridge.readyState!==1){gatewayResponse(res,503,{error:'Open Cluster and connect the local Agent to confirm the folder path'});return;}
+     const requestId=crypto.randomUUID();
+     const timer=setTimeout(()=>{pendingTools.delete(requestId);gatewayResponse(res,504,{error:'Folder confirmation timed out'});},125000);
+     pendingTools.set(requestId,{res,timer,name:m.name,root:name});
+     send(browserBridge,{type:'tool_call',requestId,name:m.name,args:{root:name,candidates:found.candidates,truncated:found.truncated}});
+    }catch(e){gatewayResponse(res,422,{error:e.message})}
     return;
    }
    if(!browserBridge||browserBridge.readyState!==1){gatewayResponse(res,503,{error:'Cluster browser bridge disconnected'});return;}
@@ -119,6 +126,15 @@ wss.on('connection',ws=>{
     if(m.type==='ping'){send(ws,{type:'pong',requestId:m.requestId,at:Date.now()});return;}
     if(m.type==='bridge_register'){browserBridge=ws;send(ws,{type:'bridge_registered'});return;}
     if(m.type==='tool_result'){const pending=pendingTools.get(m.requestId);if(!pending||ws!==browserBridge)return;pendingTools.delete(m.requestId);clearTimeout(pending.timer);
+     if(pending.name==='cluster.find_root_windows_path'&&!m.error){
+      const chosen=String(m.result?.absolutePath||'');
+      try{
+       const real=validRoot(chosen);
+       if(path.win32.basename(real).toLowerCase()!==String(pending.root).toLowerCase())throw Error('Folder name does not match Explorer root');
+       gatewayResponse(pending.res,200,{result:{root:pending.root,absolutePath:real,verified:false,confirmedByUser:true,reason:'BROWSER_HANDLE_IDENTITY_NOT_PROVABLE'}});
+      }catch(e){gatewayResponse(pending.res,422,{error:e.message})}
+      return;
+     }
      if(pending.name==='cluster.powershell_request'&&!m.error&&m.result?.approved===true){
       if(sessions.size===0){gatewayResponse(pending.res,403,{error:'POWERSHELL_WINDOW_REQUIRED: Open a PowerShell session in Cluster first'});return;}
       const command=pending.command;
