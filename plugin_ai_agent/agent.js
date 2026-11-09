@@ -7,7 +7,7 @@ panel.innerHTML='<div class="cai-bar"><strong>✧ AI Agent</strong><span id="cai
 host.append(panel);
 const guide=document.createElement('section');guide.id='caiConnectGuide';guide.className='cai-guide';
 guide.innerHTML=`<div class="cai-guide-head"><strong data-zh="連接 ChatGPT" data-en="Connect ChatGPT"></strong></div><div class="cai-guide-steps"><ol>
-<li data-zh="更新前請先關閉現有 Cluster MCP 與 OAuth Connect 視窗；更新器會保留原有 Token。若提示服務正在執行，先停止服務再重試。" data-en="Before updating, close existing Cluster MCP and OAuth Connect windows. The updater preserves your tokens. If a service is running, stop it and retry."></li>\n<li><span data-zh="下載並執行 " data-en="Download and run "></span><a href="../tools/mcp/Cluster-MCP-OneClick.cmd" download="Cluster-MCP-OneClick.cmd">Cluster-MCP-OneClick</a></li>
+<li data-zh="新版安裝器 v20261109-safe-update-1：偵測舊服務時會列出程序並詢問是否停止；確認後更新，保留原有 Token。更新會中斷現有連線。" data-en="Installer v20261109-safe-update-1: Detects existing services and asks before stopping them. Your tokens are preserved, but active connections will be interrupted."></li>\n<li><span data-zh="下載並執行 " data-en="Download and run "></span><a href="../tools/mcp/Cluster-MCP-OneClick.cmd" download="Cluster-MCP-OneClick.cmd">Cluster-MCP-OneClick</a></li>
 <li><span data-zh="下載並執行 " data-en="Download and run "></span><a href="../tools/mcp/Cluster-ChatGPT-OAuth-Connect.cmd" download="Cluster-ChatGPT-OAuth-Connect.cmd">Cluster-ChatGPT-OAuth-Connect</a></li>
 <li data-zh="複製「Cluster ChatGPT OAuth MCP Ready」顯示的 URL。" data-en="Copy the URL shown under 'Cluster ChatGPT OAuth MCP Ready'."></li>
 <li data-zh="開啟 ChatGPT → 個人檔案 → 設定 → 外掛程序 → 瀏覽目錄 → 右上角新增 → 新增自訂 MCP 服務器。" data-en="Open ChatGPT → Profile → Settings → Plugins → Browse directory → Add (top right) → Add custom MCP server."></li>
