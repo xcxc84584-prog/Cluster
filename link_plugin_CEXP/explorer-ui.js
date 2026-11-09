@@ -25,7 +25,7 @@
    const overlay=document.createElement('div');overlay.className='cexp-path-overlay';
    const card=document.createElement('section');card.className='cexp-path-dialog';card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');
    const title=document.createElement('strong');title.textContent=tr('登記 Windows 絕對路徑','Register Windows absolute path');
-   const x=document.createElement('button');x.textContent='[x]';x.className='cexp-path-x';x.setAttribute('aria-label',tr('關閉','Close'));
+   const x=document.createElement('button');x.className='cexp-path-x cluster-icon-close';x.innerHTML='<span class="cluster-close-mark" aria-hidden="true"></span>';x.setAttribute('aria-label',tr('關閉','Close'));
    const description=document.createElement('p');description.textContent=tr('選填：輸入「'+name+'」的 Windows 絕對路徑，供 AI Agent 定位。可直接略過。','Optional: enter the Windows absolute path for "'+name+'" to enable AI Agent path lookup. You may skip.');
    const input=document.createElement('input');input.type='text';input.value=window.ClusterExplorerWindowsPaths.get(name);input.placeholder=kind==='directory'?'C:\\Users\\Owner\\Desktop\\test':'C:\\Users\\Owner\\Desktop\\test\\file.cpp';
    const error=document.createElement('small');error.setAttribute('role','alert');
