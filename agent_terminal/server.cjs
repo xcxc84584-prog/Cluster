@@ -56,7 +56,12 @@ const server=http.createServer((req,res)=>{
  if(req.method==='POST'&&route==='/mcp/call'){
   let raw='';req.on('data',chunk=>{raw+=chunk;if(raw.length>8192)req.destroy();});
   req.on('end',()=>{let m;try{m=JSON.parse(raw)}catch{gatewayResponse(res,400,{error:'Invalid JSON'});return;}
-   if(!['cluster.list_files','cluster.read_file','cluster.get_editor_state','cluster.list_roots','cluster.list_directory','cluster.read_path','cluster.create_file','cluster.write_path','cluster.delete_path','cluster.powershell_request'].includes(m.name)){gatewayResponse(res,400,{error:'Unknown tool'});return;}
+   if(!['cluster.list_files','cluster.read_file','cluster.get_editor_state','cluster.list_roots','cluster.find_root_windows_path','cluster.list_directory','cluster.read_path','cluster.create_file','cluster.write_path','cluster.delete_path','cluster.powershell_request'].includes(m.name)){gatewayResponse(res,400,{error:'Unknown tool'});return;}
+   if(m.name==='cluster.find_root_windows_path'){
+    const name=String(m.arguments?.root||'');
+    try{gatewayResponse(res,200,{result:{root:name,...locateRootCandidates(name),verified:false,reason:'CANDIDATES_REQUIRE_HANDLE_VERIFICATION'}})}catch(e){gatewayResponse(res,422,{error:e.message})}
+    return;
+   }
    if(!browserBridge||browserBridge.readyState!==1){gatewayResponse(res,503,{error:'Cluster browser bridge disconnected'});return;}
    const requestId=crypto.randomUUID();const timer=setTimeout(()=>{pendingTools.delete(requestId);gatewayResponse(res,504,{error:'Browser bridge timeout'});},125000);
    pendingTools.set(requestId,{res,timer,name:m.name,command:m.name==='cluster.powershell_request'?m.arguments?.command:null});
@@ -83,6 +88,26 @@ function validRoot(value,expected){
  if(!fs.statSync(canonical).isDirectory())throw Error('Not a directory');
  // Workspace display names are labels only; the user explicitly authorizes an existing absolute directory.
  return canonical;
+}
+function locateRootCandidates(name){
+ if(typeof name!=='string'||!name||name.length>255||name.includes('\\')||name.includes('/')||name==='.'||name==='..')throw Error('Invalid root name');
+ const home=require('node:os').homedir();
+ const bases=[home,path.join(home,'Desktop'),path.join(home,'Documents'),path.join(home,'Downloads'),path.join(home,'OneDrive'),path.join(home,'OneDrive','Desktop')];
+ const result=[],seen=new Set();let visited=0;
+ function walk(dir,depth){
+  if(visited++>3500||depth>3)return;
+  let entries;try{entries=fs.readdirSync(dir,{withFileTypes:true})}catch{return}
+  for(const e of entries){
+   if(!e.isDirectory()||e.isSymbolicLink()||e.name.startsWith('.')||['node_modules','AppData','$Recycle.Bin','System Volume Information'].includes(e.name))continue;
+   const candidate=path.join(dir,e.name);
+   if(e.name.toLowerCase()===name.toLowerCase()){
+    try{const real=fs.realpathSync.native(candidate);if(!seen.has(real)){seen.add(real);result.push(real)}}catch{}
+   }
+   if(depth<3&&visited<3500)walk(candidate,depth+1);
+  }
+ }
+ for(const base of bases)walk(base,0);
+ return {candidates:result.slice(0,30),scanned:visited,truncated:visited>3500};
 }
 function closeSession(id){const s=sessions.get(id);if(!s)return; sessions.delete(id);try{s.pty.kill();}catch{} }
 wss.on('connection',ws=>{
