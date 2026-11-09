@@ -33,6 +33,22 @@ const roots=new Map();const sessions=new Map();
 const gatewayStarted=Date.now();
 const gatewayTasks=new Map();
 const pendingTools=new Map();let browserBridge=null;
+const powershellJobs=new Map();
+function runApprovedPowerShell(requestId,command){
+ return new Promise((resolve,reject)=>{
+  const exe=process.env.SystemRoot?path.join(process.env.SystemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe'):'powershell.exe';
+  const encoded=Buffer.from(command,'utf16le').toString('base64');
+  const child=spawn(exe,['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',encoded],{cwd:'C:\\\\',windowsHide:true,stdio:['ignore','pipe','pipe']});
+  powershellJobs.set(requestId,child);
+  let stdout='',stderr='',bytes=0,finished=false;
+  const timeout=setTimeout(()=>{child.kill();},15000);
+  const collect=(key,buf)=>{bytes+=buf.length;if(bytes>131072){child.kill();return;}if(key==='out')stdout+=buf.toString('utf8');else stderr+=buf.toString('utf8');};
+  child.stdout.on('data',b=>collect('out',b));child.stderr.on('data',b=>collect('err',b));
+  child.on('error',e=>{if(!finished){finished=true;clearTimeout(timeout);powershellJobs.delete(requestId);reject(e)}});
+  child.on('close',code=>{if(finished)return;finished=true;clearTimeout(timeout);powershellJobs.delete(requestId);resolve({exitCode:code,stdout:stdout.slice(0,65536),stderr:stderr.slice(0,65536),truncated:bytes>131072})});
+ });
+}
+
 function gatewayResponse(res,status,data){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));}
 const server=http.createServer((req,res)=>{
  const route=(req.url||'').split('?')[0];
@@ -42,8 +58,8 @@ const server=http.createServer((req,res)=>{
   req.on('end',()=>{let m;try{m=JSON.parse(raw)}catch{gatewayResponse(res,400,{error:'Invalid JSON'});return;}
    if(!['cluster.list_files','cluster.read_file','cluster.get_editor_state','cluster.list_roots','cluster.list_directory','cluster.read_path','cluster.create_file','cluster.write_path','cluster.delete_path','cluster.powershell_request'].includes(m.name)){gatewayResponse(res,400,{error:'Unknown tool'});return;}
    if(!browserBridge||browserBridge.readyState!==1){gatewayResponse(res,503,{error:'Cluster browser bridge disconnected'});return;}
-   const requestId=crypto.randomUUID();const timer=setTimeout(()=>{pendingTools.delete(requestId);gatewayResponse(res,504,{error:'Browser bridge timeout'});},10000);
-   pendingTools.set(requestId,{res,timer});
+   const requestId=crypto.randomUUID();const timer=setTimeout(()=>{pendingTools.delete(requestId);gatewayResponse(res,504,{error:'Browser bridge timeout'});},30000);
+   pendingTools.set(requestId,{res,timer,name:m.name,command:m.name==='cluster.powershell_request'?m.arguments?.command:null});
    send(browserBridge,{type:'tool_call',requestId,name:m.name,args:m.arguments||{}});
   });return;
  }
@@ -77,7 +93,13 @@ wss.on('connection',ws=>{
    if(ws.clusterAgentMode){
     if(m.type==='ping'){send(ws,{type:'pong',requestId:m.requestId,at:Date.now()});return;}
     if(m.type==='bridge_register'){browserBridge=ws;send(ws,{type:'bridge_registered'});return;}
-    if(m.type==='tool_result'){const pending=pendingTools.get(m.requestId);if(!pending||ws!==browserBridge)return;pendingTools.delete(m.requestId);clearTimeout(pending.timer);gatewayResponse(pending.res,m.error?422:200,m.error?{error:String(m.error).slice(0,300)}:{result:m.result});return;}
+    if(m.type==='tool_result'){const pending=pendingTools.get(m.requestId);if(!pending||ws!==browserBridge)return;pendingTools.delete(m.requestId);clearTimeout(pending.timer);
+     if(pending.name==='cluster.powershell_request'&&!m.error&&m.result?.approved===true){
+      const command=pending.command;
+      if(typeof command!=='string'||!command.trim()||command.length>2000){gatewayResponse(pending.res,422,{error:'Invalid approved command'});return;}
+      runApprovedPowerShell(m.requestId,command).then(result=>gatewayResponse(pending.res,200,{result})).catch(e=>gatewayResponse(pending.res,422,{error:e.message}));return;
+     }
+     gatewayResponse(pending.res,m.error?422:200,m.error?{error:String(m.error).slice(0,300)}:{result:m.result});return;}
     if(m.type==='provider_get'){const p=readProvider();send(ws,{type:'provider_info',configured:!!p.apiKey,model:p.model});return;}
     if(m.type==='provider_set'){
      if(typeof m.apiKey!=='string'||!/^sk-[\w-]{10,256}$/.test(m.apiKey)||typeof m.model!=='string'||/^[\w.:-]{1,100}$/.test(m.model)===false)throw Error('Invalid API key or model');
