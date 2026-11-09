@@ -98,23 +98,33 @@ function validRoot(value,expected){
 }
 function locateRootCandidates(name){
  if(typeof name!=='string'||!name||name.length>255||name.includes('\\')||name.includes('/')||name==='.'||name==='..')throw Error('Invalid root name');
- const home=require('node:os').homedir();
+ const os=require('node:os'),home=os.homedir(),found=[],seen=new Set(),visited=new Set();
  const bases=[home,path.join(home,'Desktop'),path.join(home,'Documents'),path.join(home,'Downloads'),path.join(home,'OneDrive'),path.join(home,'OneDrive','Desktop')];
- const result=[],seen=new Set();let visited=0;
- function walk(dir,depth){
-  if(visited++>3500||depth>3)return;
-  let entries;try{entries=fs.readdirSync(dir,{withFileTypes:true})}catch{return}
-  for(const e of entries){
-   if(!e.isDirectory()||e.isSymbolicLink()||e.name.startsWith('.')||['node_modules','AppData','$Recycle.Bin','System Volume Information'].includes(e.name))continue;
-   const candidate=path.join(dir,e.name);
-   if(e.name.toLowerCase()===name.toLowerCase()){
-    try{const real=fs.realpathSync.native(candidate);if(!seen.has(real)){seen.add(real);result.push(real)}}catch{}
-   }
-   if(depth<3&&visited<3500)walk(candidate,depth+1);
+ if(process.platform==='win32'){
+  for(const drive of 'CDEFGHIJKLMNOPQRSTUVWXYZ'){
+   const root=drive+':\\';
+   if(fs.existsSync(root))bases.push(root);
   }
  }
- for(const base of bases)walk(base,0);
- return {candidates:result.slice(0,30),scanned:visited,truncated:visited>3500};
+ let scanned=0,truncated=false;
+ const excluded=new Set(['node_modules','AppData','$Recycle.Bin','System Volume Information','Windows','Program Files','Program Files (x86)','ProgramData','.git']);
+ function walk(dir,depth){
+  if(scanned>=12000){truncated=true;return}
+  let canonical;try{canonical=fs.realpathSync.native(dir)}catch{return}
+  if(visited.has(canonical))return;visited.add(canonical);
+  let entries;try{entries=fs.readdirSync(canonical,{withFileTypes:true})}catch{return}
+  for(const e of entries){
+   if(scanned++>=12000){truncated=true;break}
+   if(!e.isDirectory()||e.isSymbolicLink()||excluded.has(e.name))continue;
+   const candidate=path.join(canonical,e.name);
+   if(e.name.toLowerCase()===name.toLowerCase()){
+    try{const real=fs.realpathSync.native(candidate);if(!seen.has(real)){seen.add(real);found.push(real)}}catch{}
+   }
+   if(depth<5&&!e.name.startsWith('.')&&found.length<30)walk(candidate,depth+1);
+  }
+ }
+ for(const base of bases){if(scanned>=12000)break;walk(base,0)}
+ return {candidates:found.slice(0,30),scanned,truncated};
 }
 function closeSession(id){const s=sessions.get(id);if(!s)return; sessions.delete(id);try{s.pty.kill();}catch{} }
 wss.on('connection',ws=>{
