@@ -23,12 +23,77 @@ function lang(){return document.getElementById('uiLanguage')?.value==='en'?'en':
 function updateGuide(){guide.hidden=!ready;const state=document.getElementById('caiGuideState');if(state)state.textContent=lang()==='zh'?'本地 Agent 已 BIND；遠端 HTTPS MCP 尚未設定':'Local Agent bound; remote HTTPS MCP not configured';}
 function translate(){const l=lang();panel.querySelectorAll('[data-zh]').forEach(e=>e.textContent=e.dataset[l]);$('caiPrompt').placeholder=$('caiPrompt').dataset['placeholder'+(l==='zh'?'Zh':'En')];$('caiStatus').textContent=ready?(l==='zh'?'已連線':'Connected'):(l==='zh'?'未連線':'Disconnected');updateGuide();}
 function message(s,kind='system'){const e=document.createElement('div');e.className='cai-msg cai-'+kind;e.textContent=s;$('caiFeed').append(e);$('caiFeed').scrollTop=$('caiFeed').scrollHeight;}
+
+const explorerTools=Object.freeze({
+ async run(name,args={}){
+  const api=window.ClusterCEXP;if(!api)throw Error('Explorer unavailable');
+  const tr=(zh,en)=>lang()==='zh'?zh:en;
+  const roots=api.roots;
+  const segments=String(args.path||'').split('/').filter(Boolean);
+  if(!segments.length||segments.some(x=>x==='.'||x==='..'||x.includes('\\')||x.includes('\\0')))throw Error('Invalid Explorer path');
+  const root=roots.find(n=>n.name===segments[0]);
+  if(!root)throw Error('Explorer root not found');
+  let handle=root.handle;
+  for(let i=1;i<segments.length;i++){
+   if(handle.kind!=='directory')throw Error('Not a directory');
+   handle=i===segments.length-1&&name!=='cluster.list_directory'&&name!=='cluster.create_file'?await handle.getFileHandle(segments[i]):await handle.getDirectoryHandle(segments[i]);
+  }
+  const audit=(zh,en,kind='system')=>message('['+new Date().toLocaleTimeString()+'] '+tr(zh,en),kind);
+  const check=async(write=false)=>{if(await handle.queryPermission?.({mode:write?'readwrite':'read'})!=='granted')throw Error('Explorer browser permission required; grant access in Explorer first');};
+  if(name==='cluster.list_roots'){return roots.map(n=>({name:n.name,kind:n.kind}));}
+  if(name==='cluster.list_directory'){
+   if(handle.kind!=='directory')throw Error('Not a directory');await check();
+   const items=[];for await(const h of handle.values()){if(h.name==='.cluster-explorer-order.json')continue;items.push({name:h.name,kind:h.kind});if(items.length>=500)break;}
+   audit('查詢目錄：'+args.path,'Listed directory: '+args.path);return {path:args.path,items,limit:500};
+  }
+  if(name==='cluster.read_path'){
+   if(handle.kind!=='file')throw Error('Not a file');await check();const f=await handle.getFile();if(f.size>65536)throw Error('Read limit 64 KiB');
+   const content=new TextDecoder('utf-8',{fatal:true}).decode(await f.arrayBuffer());
+   audit('讀取文件：'+args.path,'Read file: '+args.path);return {path:args.path,content,size:f.size,lastModified:f.lastModified};
+  }
+  if(name==='cluster.create_file'){
+   if(handle.kind!=='directory')throw Error('Parent directory required');await check(true);
+   const filename=String(args.name||'');if(!filename||filename==='.'||filename==='..'||/[\\/\x00-\x1f]/.test(filename))throw Error('Invalid filename');
+   try{await handle.getFileHandle(filename);throw Error('File already exists');}catch(e){if(e.message==='File already exists')throw e;if(e.name!=='NotFoundError')throw e;}
+   const h=await handle.getFileHandle(filename,{create:true});audit('建立文件：'+args.path+'/'+filename,'Created file: '+args.path+'/'+filename);
+   api.emit('ai-create');return {created:true,path:args.path+'/'+filename};
+  }
+  if(name==='cluster.write_path'){
+   if(handle.kind!=='file')throw Error('Not a file');await check(true);
+   const content=args.content;if(typeof content!=='string'||new TextEncoder().encode(content).length>65536)throw Error('Write limit 64 KiB');
+   const f=await handle.getFile();if(f.size>65536)throw Error('File too large');
+   new TextDecoder('utf-8',{fatal:true}).decode(await f.arrayBuffer());
+   if(args.expectedLastModified!==f.lastModified)throw Error('File changed or expectedLastModified missing; read first');
+   const w=await handle.createWritable();try{await w.write(content);await w.close();}catch(e){try{await w.abort()}catch{}throw e}
+   audit('修改文件：'+args.path,'Updated file: '+args.path);api.emit('ai-write');return {updated:true,path:args.path};
+  }
+  if(name==='cluster.delete_path'){
+   if(!root.parent&&segments.length===1)throw Error('Cannot delete root');
+   const parentParts=segments.slice(0,-1);let parent=root.handle;
+   for(const part of parentParts.slice(1))parent=await parent.getDirectoryHandle(part);
+   if(handle.kind!=='file')throw Error('Only file deletion is supported');
+   if(await parent.queryPermission?.({mode:'readwrite'})!=='granted')throw Error('Write permission required');
+   const allowed=window.confirm(tr('AI Agent 要刪除文件：','AI Agent requests deletion of file: ')+args.path+'\n'+tr('是否授權？','Authorize?'));
+   audit(allowed?'已授權刪除：'+args.path:'拒絕刪除：'+args.path,allowed?'Deletion authorized: '+args.path:'Deletion denied: '+args.path,allowed?'system':'error');
+   if(!allowed)throw Error('User denied deletion');
+   await parent.removeEntry(segments.at(-1));api.emit('ai-delete');return {deleted:true,path:args.path};
+  }
+  if(name==='cluster.powershell_request'){
+   const command=String(args.command||'');if(!command||command.length>2000)throw Error('Invalid command');
+   const allowed=window.confirm(tr('AI Agent 要使用本地 PowerShell：','AI Agent requests local PowerShell: ')+'\n'+command+'\n'+tr('是否授權？','Authorize?'));
+   audit(allowed?'已授權 PowerShell 請求':'拒絕 PowerShell 請求',allowed?'PowerShell request authorized':'PowerShell request denied',allowed?'system':'error');
+   if(!allowed)throw Error('User denied PowerShell');
+   throw Error('PowerShell execution bridge not installed; authorization alone does not execute commands');
+  }
+  throw Error('Unsupported tool');
+ }
+});
 function deactivate(){active=false;panel.hidden=true;document.body.classList.remove('cluster-ai-active');tab?.classList.remove('is-active');}
 function syncTabs(){if(!tab)return;if(!tabs.contains(tab))tabs.append(tab);tab.classList.toggle('is-active',active);window.ClusterTabOrder?.apply?.();}
 function open(){window.ClusterTerminal?.deactivate?.();active=true;panel.hidden=false;document.body.classList.add('cluster-ai-active');document.getElementById('editorShell').hidden=true;document.getElementById('empty').hidden=true;document.getElementById('localRangeView').hidden=true;document.getElementById('clusterBottomBar').hidden=true;document.querySelectorAll('#tabList .tab').forEach(e=>e.classList.remove('is-active'));if(!tab){tab=document.createElement('div');tab.className='tab cai-tab';tab.dataset.tabKey='ai-agent';const b=document.createElement('button');b.className='tab-select';b.textContent='✧ AI Agent';b.onclick=open;const x=document.createElement('button');x.className='tab-close';x.textContent='×';x.onclick=close;tab.append(b,x);tabs.append(tab);}tab.classList.add('is-active');window.ClusterTabOrder?.apply?.();translate();}
 function close(){deactivate();tab?.remove();tab=null;window.cluster?.fm?.notify?.();}
 function connect(){const token=$('caiToken').value.trim();if(!/^[a-f0-9]{64}$/i.test(token)){$('caiError').textContent='Invalid 64-character pairing token';return;}// Persist only after successful authentication; both plugins use the same credential.
-ws?.close();ready=false;$('caiError').textContent='';$('caiStatus').textContent='Connecting…';try{const socket=new WebSocket('ws://127.0.0.1:43879/agent');ws=socket;socket.onopen=()=>socket.send(JSON.stringify({type:'auth',token}));socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type==='ready'){ready=true;sessionStorage.setItem(tokenKey,token);if($('caiRemember').checked)localStorage.setItem(rememberKey,token);else localStorage.removeItem(rememberKey);sessionStorage.removeItem(oldKey);localStorage.removeItem(oldKey);window.dispatchEvent(new Event('cluster-local-paired'));socket.send(JSON.stringify({type:'bridge_register'}));$('caiSetup').hidden=true;$('caiWorkspace').hidden=false;translate();message(lang()==='zh'?'本地 Gateway 已連線。此視窗只顯示連線與任務狀態。':'Local Gateway connected. This panel displays connection and task status only.');}else if(m.type==='tool_call'){const bridge=window.ClusterReadOnlyBridge;const args=m.args||{};Promise.resolve().then(async()=>{if(!bridge)throw Error('Editor bridge not loaded');if(m.name==='cluster.list_files')return bridge.listFiles();if(m.name==='cluster.get_editor_state')return bridge.getEditorState();if(m.name==='cluster.read_file')return bridge.readFile(args.id);throw Error('Unsupported read-only tool');}).then(result=>socket.send(JSON.stringify({type:'tool_result',requestId:m.requestId,result}))).catch(err=>socket.send(JSON.stringify({type:'tool_result',requestId:m.requestId,error:String(err.message)})));message('MCP · '+m.name);}else if(m.type==='provider_info'){$('caiProviderStatus').textContent=m.configured?'Configured: '+m.model:'Not configured';$('caiModel').value=m.model||'gpt-4.1-mini';$('caiApiKey').value='';message(m.configured?'Model ready: '+m.model:'Configure a model to send tasks');}else if(m.type==='task_result'){message(m.text,'system');}else if(m.type==='pong'){message(lang()==='zh'?'本地 Agent 回應正常 · PONG':'Local Agent responded · PONG');}else if(m.type==='task_status'){message(m.status.toUpperCase()+' · '+m.message,m.status==='failed'?'error':'system');if(['completed','failed','interrupted'].includes(m.status)&&m.requestId===taskId){taskId=null;$('caiStop').hidden=true;}}else if(m.type==='error'){$('caiError').textContent=m.message;message('ERROR · '+m.message,'error');}};socket.onerror=()=>{$('caiError').textContent=lang()==='zh'?'無法連接本地 Agent。請先啟動安裝程式。':'Cannot reach local Agent. Start the installed service.';};socket.onclose=()=>{if(ws!==socket)return;ready=false;taskId=null;guide.hidden=true;$('caiStop').hidden=true;$('caiProvider').hidden=true;$('caiSetup').hidden=false;$('caiWorkspace').hidden=true;translate();};}catch(e){$('caiError').textContent=e.message;}}
+ws?.close();ready=false;$('caiError').textContent='';$('caiStatus').textContent='Connecting…';try{const socket=new WebSocket('ws://127.0.0.1:43879/agent');ws=socket;socket.onopen=()=>socket.send(JSON.stringify({type:'auth',token}));socket.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type==='ready'){ready=true;sessionStorage.setItem(tokenKey,token);if($('caiRemember').checked)localStorage.setItem(rememberKey,token);else localStorage.removeItem(rememberKey);sessionStorage.removeItem(oldKey);localStorage.removeItem(oldKey);window.dispatchEvent(new Event('cluster-local-paired'));socket.send(JSON.stringify({type:'bridge_register'}));$('caiSetup').hidden=true;$('caiWorkspace').hidden=false;translate();message(lang()==='zh'?'本地 Gateway 已連線。此視窗只顯示連線與任務狀態。':'Local Gateway connected. This panel displays connection and task status only.');}else if(m.type==='tool_call'){const bridge=window.ClusterReadOnlyBridge;const args=m.args||{};Promise.resolve().then(async()=>{if(m.name.startsWith('cluster.')&&['cluster.list_roots','cluster.list_directory','cluster.read_path','cluster.create_file','cluster.write_path','cluster.delete_path','cluster.powershell_request'].includes(m.name))return explorerTools.run(m.name,args);if(!bridge)throw Error('Editor bridge not loaded');if(m.name==='cluster.list_files')return bridge.listFiles();if(m.name==='cluster.get_editor_state')return bridge.getEditorState();if(m.name==='cluster.read_file')return bridge.readFile(args.id);throw Error('Unsupported read-only tool');}).then(result=>socket.send(JSON.stringify({type:'tool_result',requestId:m.requestId,result}))).catch(err=>socket.send(JSON.stringify({type:'tool_result',requestId:m.requestId,error:String(err.message)})));message((lang()==='zh'?'收到操作請求：':'Operation requested: ')+m.name+' '+String(args.path||args.command||'').slice(0,160));}else if(m.type==='provider_info'){$('caiProviderStatus').textContent=m.configured?'Configured: '+m.model:'Not configured';$('caiModel').value=m.model||'gpt-4.1-mini';$('caiApiKey').value='';message(m.configured?'Model ready: '+m.model:'Configure a model to send tasks');}else if(m.type==='task_result'){message(m.text,'system');}else if(m.type==='pong'){message(lang()==='zh'?'本地 Agent 回應正常 · PONG':'Local Agent responded · PONG');}else if(m.type==='task_status'){message(m.status.toUpperCase()+' · '+m.message,m.status==='failed'?'error':'system');if(['completed','failed','interrupted'].includes(m.status)&&m.requestId===taskId){taskId=null;$('caiStop').hidden=true;}}else if(m.type==='error'){$('caiError').textContent=m.message;message('ERROR · '+m.message,'error');}};socket.onerror=()=>{$('caiError').textContent=lang()==='zh'?'無法連接本地 Agent。請先啟動安裝程式。':'Cannot reach local Agent. Start the installed service.';};socket.onclose=()=>{if(ws!==socket)return;ready=false;taskId=null;guide.hidden=true;$('caiStop').hidden=true;$('caiProvider').hidden=true;$('caiSetup').hidden=false;$('caiWorkspace').hidden=true;translate();};}catch(e){$('caiError').textContent=e.message;}}
 $('caiForm').onsubmit=e=>{e.preventDefault();const prompt=$('caiPrompt').value.trim();if(!prompt||!ready||ws?.readyState!==1)return;const requestId=crypto.randomUUID();if(taskId){message('A task is already running','error');return;}taskId=requestId;$('caiStop').hidden=false;message(prompt,'user');ws.send(JSON.stringify({type:'task',requestId,prompt}));$('caiPrompt').value='';};
 button.onclick=open;$('caiClose').onclick=close;$('caiSettings').onclick=()=>{$('caiProvider').hidden=false;$('caiWorkspace').hidden=true;};$('caiBack').onclick=()=>{$('caiProvider').hidden=true;$('caiWorkspace').hidden=false;};$('caiSaveProvider').onclick=()=>{if(!ready){$('caiProviderStatus').textContent='Agent disconnected';return;}ws.send(JSON.stringify({type:'provider_set',apiKey:$('caiApiKey').value.trim(),model:$('caiModel').value.trim()}));};$('caiStop').onclick=()=>{if(taskId&&ready)ws.send(JSON.stringify({type:'task_cancel',requestId:taskId}));};$('caiPing').onclick=()=>{if(!ready||ws?.readyState!==WebSocket.OPEN){message(lang()==='zh'?'尚未連線':'Not connected','error');return;}ws.send(JSON.stringify({type:'ping',requestId:crypto.randomUUID()}));};$('caiRevokeLocal').onclick=()=>{if(!window.ClusterTerminal?.revokeLocalPermission?.())return;ws?.close();ready=false;sessionStorage.removeItem(tokenKey);localStorage.removeItem(rememberKey);sessionStorage.removeItem(oldKey);localStorage.removeItem(oldKey);$('caiToken').value='';$('caiRemember').checked=false;$('caiSetup').hidden=false;$('caiWorkspace').hidden=true;translate();message(lang()==='zh'?'本地權限已移除，PowerShell 視窗已關閉':'Local permission removed; PowerShell sessions closed');};$('caiConnect').onclick=connect;
 document.getElementById('uiLanguage')?.addEventListener('change',translate);
