@@ -32,7 +32,7 @@ const MAX_SESSIONS=8,MAX_MESSAGE=65536;
 const roots=new Map();const sessions=new Map();
 const gatewayStarted=Date.now();
 const gatewayTasks=new Map();
-const pendingTools=new Map();let browserBridge=null;const registeredRootPaths=new Map();
+const pendingTools=new Map();let browserBridge=null;
 const powershellJobs=new Map();
 function runApprovedPowerShell(requestId,command){
  return new Promise((resolve,reject)=>{
@@ -56,7 +56,7 @@ const server=http.createServer((req,res)=>{
  if(req.method==='POST'&&route==='/mcp/call'){
   let raw='';req.on('data',chunk=>{raw+=chunk;if(raw.length>8192)req.destroy();});
   req.on('end',()=>{let m;try{m=JSON.parse(raw)}catch{gatewayResponse(res,400,{error:'Invalid JSON'});return;}
-   if(!['cluster.list_files','cluster.read_file','cluster.get_editor_state','cluster.list_roots','cluster.get_root_windows_path','cluster.list_directory','cluster.read_path','cluster.create_file','cluster.write_path','cluster.delete_path','cluster.powershell_request'].includes(m.name)){gatewayResponse(res,400,{error:'Unknown tool'});return;}
+   if(!['cluster.list_files','cluster.read_file','cluster.get_editor_state','cluster.list_roots','cluster.list_directory','cluster.read_path','cluster.create_file','cluster.write_path','cluster.delete_path','cluster.powershell_request'].includes(m.name)){gatewayResponse(res,400,{error:'Unknown tool'});return;}
    if(!browserBridge||browserBridge.readyState!==1){gatewayResponse(res,503,{error:'Cluster browser bridge disconnected'});return;}
    const requestId=crypto.randomUUID();const timer=setTimeout(()=>{pendingTools.delete(requestId);gatewayResponse(res,504,{error:'Browser bridge timeout'});},125000);
    pendingTools.set(requestId,{res,timer,name:m.name,command:m.name==='cluster.powershell_request'?m.arguments?.command:null});
@@ -91,12 +91,6 @@ wss.on('connection',ws=>{
   let m;try{m=JSON.parse(raw.toString());if(!m||typeof m.type!=='string')throw Error('Invalid message');
    if(!authorized){if(m.type!=='auth'||typeof m.token!=='string'||m.token.length!==token.length||!crypto.timingSafeEqual(Buffer.from(m.token),Buffer.from(token)))throw Error('Authentication failed');authorized=true;clearTimeout(timeout);send(ws,{type:'ready',maxSessions:MAX_SESSIONS});return;}
    if(ws.clusterAgentMode){
-    if(m.type==='root_path_register'){
-     if(ws!==browserBridge)throw Error('Only registered Cluster browser can register paths');
-     const name=String(m.root||'');if(!name||name.length>255)throw Error('Invalid root');
-     const dir=validRoot(m.path);if(path.win32.basename(dir).toLowerCase()!==name.toLowerCase())throw Error('ROOT_NAME_MISMATCH: selected folder name and Windows path differ');
-     registeredRootPaths.set(name,dir);send(ws,{type:'root_path_registered',root:name,path:dir});return;
-    }
     if(m.type==='ping'){send(ws,{type:'pong',requestId:m.requestId,at:Date.now()});return;}
     if(m.type==='bridge_register'){browserBridge=ws;send(ws,{type:'bridge_registered'});return;}
     if(m.type==='tool_result'){const pending=pendingTools.get(m.requestId);if(!pending||ws!==browserBridge)return;pendingTools.delete(m.requestId);clearTimeout(pending.timer);
@@ -106,7 +100,6 @@ wss.on('connection',ws=>{
       if(typeof command!=='string'||!command.trim()||command.length>2000){gatewayResponse(pending.res,422,{error:'Invalid approved command'});return;}
       runApprovedPowerShell(m.requestId,command).then(result=>{send(browserBridge,{type:'powershell_execution_result',command,result});gatewayResponse(pending.res,200,{result});}).catch(e=>{send(browserBridge,{type:'powershell_execution_result',command,error:e.message});gatewayResponse(pending.res,422,{error:e.message});});return;
      }
-     if(pending.name==='cluster.get_root_windows_path'&&!m.error){const name=String(m.result?.root||'');const dir=registeredRootPaths.get(name);gatewayResponse(pending.res,200,{result:{root:name,absolutePath:dir||null,verified:false,registered:!!dir,reason:dir?'HANDLE_IDENTITY_NOT_VERIFIED':'ROOT_PATH_NOT_REGISTERED',verification:'Windows path exists and basename matches Explorer root; handle identity not independently verified'}});return;}
      gatewayResponse(pending.res,m.error?422:200,m.error?{error:String(m.error).slice(0,300)}:{result:m.result});return;}
     if(m.type==='provider_get'){const p=readProvider();send(ws,{type:'provider_info',configured:!!p.apiKey,model:p.model});return;}
     if(m.type==='provider_set'){
