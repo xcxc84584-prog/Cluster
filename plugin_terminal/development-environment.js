@@ -8,6 +8,7 @@ const packages=[
 ['node','Node.js / npm','LTS','winget install --id OpenJS.NodeJS.LTS -e','winget uninstall --id OpenJS.NodeJS.LTS -e','node --version'],
 ['cmake','CMake','latest','winget install --id Kitware.CMake -e','winget uninstall --id Kitware.CMake -e','cmake --version'],
 ['ninja','Ninja','latest','winget install --id Ninja-build.Ninja -e','winget uninstall --id Ninja-build.Ninja -e','ninja --version'],
+['gcc','GCC / G++ (MSYS2 UCRT64)','latest','winget install --id MSYS2.MSYS2 -e --accept-package-agreements --accept-source-agreements; & "C:\\msys64\\usr\\bin\\bash.exe" -lc "pacman -Syu --noconfirm; pacman -S --needed --noconfirm mingw-w64-ucrt-x86_64-gcc"','echo Use MSYS2 pacman to manage GCC packages.','C:\\msys64\\ucrt64\\bin\\g++.exe --version'],
 ['msys2','MSYS2 (GCC / G++)','rolling','winget install --id MSYS2.MSYS2 -e && C:\\msys64\\usr\\bin\\bash.exe -lc "pacman -Sy --noconfirm mingw-w64-ucrt-x86_64-gcc"','echo Manual removal required: MSYS2 may contain shared toolchains.','C:\\msys64\\ucrt64\\bin\\g++.exe --version'],
 ['java','OpenJDK','21','winget install --id EclipseAdoptium.Temurin.21.JDK -e','winget uninstall --id EclipseAdoptium.Temurin.21.JDK -e','java -version'],
 ['arduino','Arduino CLI','latest','winget install --id ArduinoSA.CLI -e','winget uninstall --id ArduinoSA.CLI -e','arduino-cli version'],
