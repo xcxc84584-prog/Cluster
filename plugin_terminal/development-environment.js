@@ -39,7 +39,19 @@ panel.style.cssText='overflow:auto;padding:20px;background:#101116;color:#eee;po
 host.append(panel);
 const tab=document.createElement('div');tab.className='tab cluster-dev-tab';tab.dataset.tabKey='tool:development-environment';tab.style.display='none';const tabSelect=document.createElement('button');tabSelect.className='tab-select';const tabClose=document.createElement('button');tabClose.textContent='×';tab.append(tabSelect,tabClose);
 let active=false;
-function script(p,kind){const cmd=p[kind==='install'?3:kind==='uninstall'?4:5];const lines=['@echo off','setlocal','chcp 65001 >nul','echo Cluster: '+p[1]+' '+kind];if(kind==='uninstall')lines.push('choice /C YN /M "Remove '+p[1]+'?"','if errorlevel 2 exit /b 2');lines.push(cmd,'set "result=%errorlevel%"','echo Exit code: %result%','pause','exit /b %result%');return lines.join('\r\n')+'\r\n';}
+function script(p,kind){const cmd=p[kind==='install'?3:kind==='uninstall'?4:5];const lines=['@echo off','setlocal','chcp 65001 >nul','echo Cluster: '+p[1]+' '+kind];if(kind==='uninstall')lines.push('choice /C YN /M "Remove '+p[1]+'?"','if errorlevel 2 exit /b 2');
+if(kind==='install'&&(p[0]==='esp32'||p[0]==='nano')){
+ lines.push('where arduino-cli >nul 2>&1','if not errorlevel 1 goto arduino_ready',
+ 'echo Arduino CLI is required. Installing via winget...',
+ 'where winget >nul 2>&1 || (echo Windows App Installer / winget is required. & exit /b 1)',
+ 'winget install --id ArduinoSA.CLI -e --accept-package-agreements --accept-source-agreements',
+ 'if errorlevel 1 (echo Arduino CLI installation failed. & exit /b 1)',
+ 'set "PATH=%LOCALAPPDATA%\\Microsoft\\WinGet\\Links;%ProgramFiles%\\Arduino CLI;%ProgramFiles%\\Arduino CLI\\bin;%PATH%"',
+ ':arduino_ready',
+ 'where arduino-cli >nul 2>&1 || (echo Arduino CLI not found after installation. Restart terminal and retry. & exit /b 1)',
+ 'arduino-cli version','if errorlevel 1 exit /b 1');
+}
+lines.push(cmd,'set "result=%errorlevel%"','echo Exit code: %result%','pause','exit /b %result%');return lines.join('\r\n')+'\r\n';}
 function download(p,kind){const blob=new Blob([script(p,kind)],{type:'application/octet-stream'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=p[0]+'-'+kind+'.cmd';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 const searchAliases={"python":"python py py3 pip venv","git":"git version control","node":"javascript js node npm web","cmake":"c cpp c++ cmake","ninja":"c cpp c++ build ninja","msys2":"c cpp c++ gcc g++ mingw compiler","java":"java jave jdk javac","arduino":"arduino c cpp embedded","nano":"arduino nano ble nrf52840 c cpp","esp32":"esp32 arduino c cpp","pyserial":"python serial uart","clang":"c cpp c++ clang llvm compiler","dotnet":"c# csharp dotnet asp.net","go":"golang go","rust":"rust rustlang cargo","powershell7":"powershell ps pwsh","gh":"github gh","vscode":"editor vscode ide","esptool":"esp32 esp8266 python esptool","pytest":"python testing pytest","black":"python formatter black","ruff":"python linter ruff","jupyter":"python notebook data science","platformio":"arduino esp32 embedded python platformio","docker":"container docker","typescript":"typescript ts javascript node","openocd":"openocd c cpp embedded jtag debug","postman":"api http postman"};
 const normalizedQuery=q=>q.toLowerCase().normalize('NFKC').trim();
