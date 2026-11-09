@@ -32,6 +32,7 @@ const tools=[
  {name:'cluster.create_file',description:'Create an empty file in an authorized Explorer directory.',inputSchema:{type:'object',properties:{path:{type:'string'},name:{type:'string'}},required:['path','name'],additionalProperties:false}},
  {name:'cluster.write_path',description:'Replace an authorized Explorer file with UTF-8 text. No timestamp or extra confirmation flags required. This overwrites the full file.',inputSchema:{type:'object',properties:{path:{type:'string'},content:{type:'string'}},required:['path','content'],additionalProperties:false}},
  {name:'cluster.delete_path',description:'Delete one Explorer file when workspace Delete permission and browser write permission are granted.',inputSchema:{type:'object',properties:{path:{type:'string'}},required:['path'],additionalProperties:false}},
+ {name:'cluster.open_powershell',description:'Request opening a Cluster PowerShell terminal window; execution still requires Workspace PowerShell permission and approval.',inputSchema:{type:'object',properties:{},additionalProperties:false}},
  {name:'cluster.powershell_request',description:'Execute a PowerShell command only after the Cluster browser explicitly confirms the exact command. Runs as the local signed-in user; not sandboxed.',inputSchema:{type:'object',properties:{path:{type:'string',description:'Authorized Explorer workspace root name'},command:{type:'string'}},required:['path','command'],additionalProperties:false}}
 ];
 const names=new Set(tools.map(x=>x.name));
