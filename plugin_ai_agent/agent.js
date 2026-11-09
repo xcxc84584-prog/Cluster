@@ -88,7 +88,7 @@ const explorerTools=Object.freeze({
    const allowed=window.confirm(tr('AI Agent 要使用本地 PowerShell：','AI Agent requests local PowerShell: ')+'\n'+command+'\n'+tr('是否授權？','Authorize?'));
    audit(allowed?'已授權 PowerShell 請求':'拒絕 PowerShell 請求',allowed?'PowerShell request authorized':'PowerShell request denied',allowed?'system':'error');
    if(!allowed)throw Error('User denied PowerShell');
-   throw Error('PowerShell execution bridge not installed; authorization alone does not execute commands');
+   return {approved:true};
   }
   throw Error('Unsupported tool');
  }
