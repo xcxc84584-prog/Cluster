@@ -78,7 +78,7 @@
   }
   const order=await getOrder(n);const oldNames=(n.children||[]).map(x=>x.name);const preferred=order.length?order:oldNames;
   items.sort((a,b)=>{const ai=preferred.indexOf(a.name),bi=preferred.indexOf(b.name);if(ai>=0&&bi>=0)return ai-bi;if(ai>=0)return -1;if(bi>=0)return 1;return Number(b.kind==='directory')-Number(a.kind==='directory')||a.name.localeCompare(b.name);});
-  n.children=items;n.expanded=true;emit('expand');
+  const changed=!n.expanded||items.length!==(n.children||[]).length||items.some((item,i)=>item!==(n.children||[])[i]);\n  n.children=items;n.expanded=true;if(changed)emit('expand');
  }
  // [FIX-OPT6-001] Snapshot every expanded descendant before refreshing; reconcile by path.
  // Refresh never collapses a folder unless it has actually been removed from disk.
@@ -96,6 +96,24 @@
   }
   emit('refresh-complete');
  }
+ // Refresh expanded Explorer folders after changes made by Windows, PowerShell, or other programs.
+ // Never prompt for permissions during background checks. Only one scan may run at a time.
+ let externalScanBusy=false;
+ async function syncExternalChanges(){
+  if(externalScanBusy||document.hidden)return;
+  externalScanBusy=true;
+  try{
+   for(const root of [...roots]){
+    if(root.kind!=='directory'||!root.expanded)continue;
+    try{
+     if(await permission(root.handle,false,false))await refreshExpanded(root);
+    }catch(e){if(e?.name!=='NotFoundError'&&e?.name!=='NotAllowedError')console.warn('[Cluster Explorer] external refresh',e)}
+   }
+  }finally{externalScanBusy=false}
+ }
+ setInterval(()=>{void syncExternalChanges()},2000);
+ window.addEventListener('focus',()=>{void syncExternalChanges()});
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)void syncExternalChanges()});
  // [ADD-OPT6-002] Resolve a file under a workspace root without loading its contents.
  // Only expand ancestors required to reveal the active editor document.
  async function revealHandle(handle){
