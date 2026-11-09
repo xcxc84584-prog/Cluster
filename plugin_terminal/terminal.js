@@ -53,5 +53,5 @@ ready=false;showError('');$('terminalPairStatus').textContent='Connecting…';$(
  $('terminalDismissGuide').onclick=()=>{if(!connected()){$('terminalSetup').hidden=true;panel.hidden=true;window.cluster?.fm?.notify?.();}else{$('terminalSetup').hidden=true;}};
  window.addEventListener('cluster-local-paired',()=>{const token=sessionStorage.getItem('cluster-terminal-token')||localStorage.getItem(STORAGE_TOKEN);if(token&&!connected()&&ws?.readyState!==WebSocket.CONNECTING){tokenInput.value=token;connect();}});if(tokenInput.value){setTimeout(()=>{if(!autoConnectTried){autoConnectTried=true;connect()}},400)}
  const ro=typeof ResizeObserver!=='undefined'?new ResizeObserver(()=>{if(selected?.fit){selected.fit.fit();resize(selected)}}):null;ro?.observe(panel);
- window.ClusterTerminal={open,createSession,closeAll,syncTabs,deactivate,revokeLocalPermission,wasUserOpened:()=>userOpenedTerminal,hasSession:()=>userOpenedTerminal&&sessions.length>0};
+ window.ClusterTerminal={open,createSession,closeAll,syncTabs,deactivate,revokeLocalPermission,wasUserOpened:()=>userOpenedTerminal,hasSession:()=>sessions.length>0,openForAgent:()=>{userOpenedTerminal=true;return createSession()}};
 })();
