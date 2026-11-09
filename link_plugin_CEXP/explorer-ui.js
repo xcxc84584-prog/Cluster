@@ -16,9 +16,29 @@
  }
  function toggle(open){panel.hidden=!open;document.body.classList.toggle('cexp-open',open);window.dispatchEvent(new Event('resize'));requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));$('cexpToggle').setAttribute('aria-expanded',String(open));if(open){$('blockDirectory').hidden=true;$('blockDirectoryButton').setAttribute('aria-expanded','false');}}
  $('cexpToggle').addEventListener('click',()=>toggle(panel.hidden));$('cexpClose').addEventListener('click',()=>toggle(false));
- $('cexpAddRoot').addEventListener('click',async()=>{try{if(!window.showDirectoryPicker)throw Error('請使用支援 File System Access API 的 Chromium 瀏覽器');const h=await showDirectoryPicker({mode:'readwrite'});await api.addRoot(h);setStatus('已加入 '+h.name);}catch(e){if(e.name!=='AbortError')setStatus(e.message,true);}});
+ $('cexpAddRoot').addEventListener('click',async()=>{try{if(!window.showDirectoryPicker)throw Error('請使用支援 File System Access API 的 Chromium 瀏覽器');const h=await showDirectoryPicker({mode:'readwrite'});const n=await api.addRoot(h);await requestWindowsPath(n);setStatus('已加入 '+h.name);}catch(e){if(e.name!=='AbortError')setStatus(e.message,true);}});
+ // Windows paths are optional user-supplied records; browsers cannot reveal them from file handles.
+ const pathStoreKey='cluster-explorer-windows-paths-v1';
+ function storedPaths(){try{return JSON.parse(localStorage.getItem(pathStoreKey)||'{}')}catch{return {}}}
+ async function requestWindowsPath(n){
+  if(!n?.persistId)return;
+  const known=storedPaths();if(known[n.persistId])return;
+  await new Promise(resolve=>{
+   const shade=document.createElement('div');shade.style.cssText='position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;background:#050a14d9;padding:18px;backdrop-filter:blur(4px)';
+   const card=document.createElement('section');card.style.cssText='background:#151d2b;color:#e6eeff;border:1px solid #385477;border-radius:12px;padding:24px;width:min(540px,100%);box-shadow:0 18px 65px #000a';
+   const en=document.getElementById('uiLanguage')?.value==='en';const title=document.createElement('h3');title.textContent=en?'Allow AI to locate this file or folder':'允許 AI 定位此檔案或資料夾';
+   const info=document.createElement('p');info.textContent=en?'Enter the full Windows path, or skip for now.':'請輸入完整 Windows 路徑，也可以先跳過。';
+   const input=document.createElement('input');input.type='text';input.placeholder=n.kind==='file'?'C:\\Users\\...\\file.txt':'C:\\Users\\...\\Folder';input.style.cssText='box-sizing:border-box;width:100%;background:#0b1220;color:#fff;border:1px solid #486080;border-radius:7px;padding:12px';
+   const error=document.createElement('p');error.style.color='#e99';const actions=document.createElement('div');actions.style.cssText='display:flex;gap:12px;justify-content:flex-end;margin-top:16px';
+   const skip=document.createElement('button');skip.textContent=en?'Skip':'跳過';const save=document.createElement('button');save.textContent=en?'Save':'儲存';save.style.cssText='background:#235c9d;color:white;padding:8px 16px;border-radius:7px';
+   const done=()=>{shade.remove();resolve()};
+   skip.onclick=done;save.onclick=()=>{const value=input.value.trim();if(!/^[A-Za-z]:\\\\/.test(value)||value.includes('\\0')){error.textContent=en?'Enter a complete Windows path.':'請輸入完整 Windows 路徑。';return}const data=storedPaths();data[n.persistId]={name:n.name,kind:n.kind,path:value};localStorage.setItem(pathStoreKey,JSON.stringify(data));window.dispatchEvent(new CustomEvent('cluster-explorer-path-saved',{detail:{id:n.persistId,path:value}}));done()};
+   actions.append(skip,save);card.append(title,info,input,error,actions);shade.append(card);document.body.append(shade);input.focus();
+  });
+ }
+ window.ClusterExplorerWindowsPaths={get:(id)=>storedPaths()[id]||null,request:requestWindowsPath};
  // [ADD-OPT4-002] Add a single file without requiring a folder root.
- $('cexpAddFile').addEventListener('click',async()=>{try{if(!window.showOpenFilePicker)throw Error('瀏覽器不支援本地檔案 Handle');const [handle]=await window.showOpenFilePicker({multiple:false});if(!handle)return;await api.addFile(handle);await window.ClusterExplorerHost.openHandle(handle);setStatus('已加入獨立檔案 '+handle.name);}catch(e){if(e.name!=='AbortError')setStatus(e.message,true);}});
+ $('cexpAddFile').addEventListener('click',async()=>{try{if(!window.showOpenFilePicker)throw Error('瀏覽器不支援本地檔案 Handle');const [handle]=await window.showOpenFilePicker({multiple:false});if(!handle)return;const n=await api.addFile(handle);if(n)await requestWindowsPath(n);await window.ClusterExplorerHost.openHandle(handle);setStatus('已加入獨立檔案 '+handle.name);}catch(e){if(e.name!=='AbortError')setStatus(e.message,true);}});
  // [FIX-OPT9-001] Refresh is an explicit collapse operation; never close editor tabs.
  // Suppress automatic active-file reveal until a later tab activation.
  $('cexpRefresh').addEventListener('click',async()=>{
