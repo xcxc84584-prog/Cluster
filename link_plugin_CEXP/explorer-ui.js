@@ -38,7 +38,7 @@
  }
  window.ClusterExplorerWindowsPaths={get:(id)=>storedPaths()[id]||null,request:requestWindowsPath};
  // [ADD-OPT4-002] Add a single file without requiring a folder root.
- $('cexpAddFile').addEventListener('click',async()=>{try{if(!window.showOpenFilePicker)throw Error('瀏覽器不支援本地檔案 Handle');const [handle]=await window.showOpenFilePicker({multiple:false});if(!handle)return;const n=await api.addFile(handle);if(n)await requestWindowsPath(n);await window.ClusterExplorerHost.openHandle(handle);setStatus('已加入獨立檔案 '+handle.name);}catch(e){if(e.name!=='AbortError')setStatus(e.message,true);}});
+ $('cexpAddFile').addEventListener('click',async()=>{try{if(!window.showOpenFilePicker)throw Error('瀏覽器不支援本地檔案 Handle');const [handle]=await window.showOpenFilePicker({multiple:false});if(!handle)return;const n=await api.addFile(handle);let target=n;if(!target){for(const item of api.roots){try{if(item.kind==='file'&&await item.handle?.isSameEntry?.(handle)){target=item;break}}catch{}}}if(target)await requestWindowsPath(target);await window.ClusterExplorerHost.openHandle(handle);setStatus('已加入獨立檔案 '+handle.name);}catch(e){if(e.name!=='AbortError')setStatus(e.message,true);}});
  // [FIX-OPT9-001] Refresh is an explicit collapse operation; never close editor tabs.
  // Suppress automatic active-file reveal until a later tab activation.
  $('cexpRefresh').addEventListener('click',async()=>{
