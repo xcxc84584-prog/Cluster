@@ -41,7 +41,8 @@ function runApprovedPowerShell(requestId,command){
   const encoded=Buffer.from(unicodePrefix+command,'utf16le').toString('base64');
   const child=spawn(exe,['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',encoded],{cwd:path.parse(process.env.SystemRoot||process.cwd()).root,windowsHide:true,stdio:['ignore','pipe','pipe']});
   powershellJobs.set(requestId,child);
-  const {StringDecoder}=require('node:string_decoder');const stdoutDecoder=new StringDecoder('utf8'),stderrDecoder=new StringDecoder('utf8');\n  let stdout='',stderr='',bytes=0,finished=false;
+  const {StringDecoder}=require('node:string_decoder');const stdoutDecoder=new StringDecoder('utf8'),stderrDecoder=new StringDecoder('utf8');
+  let stdout='',stderr='',bytes=0,finished=false;
   const timeout=setTimeout(()=>{child.kill();},15000);
   const collect=(key,buf)=>{bytes+=buf.length;if(bytes>131072){child.kill();return;}if(key==='out')stdout+=stdoutDecoder.write(buf);else stderr+=stderrDecoder.write(buf);};
   child.stdout.on('data',b=>collect('out',b));child.stderr.on('data',b=>collect('err',b));
