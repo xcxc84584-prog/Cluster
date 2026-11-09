@@ -48,7 +48,7 @@ function script(p,kind){
  const needsPython=pythonDeps.includes(p[0]);
  const needsNode=p[0]==='typescript';
  const needsArduino=arduinoDeps.includes(p[0]);
- const needsWinget=kind==='install'&&(/\\bwinget\\b/i.test(cmd)||needsPython||needsNode||needsArduino);
+ const needsWinget=kind==='install'&&(/\bwinget\b/i.test(cmd)||needsPython||needsNode||needsArduino);
  if(kind==='uninstall')lines.push('choice /C YN /M "Remove '+p[1]+'?"','if errorlevel 2 exit /b 2');
  if(needsWinget)lines.push('where winget >nul 2>&1 || (echo ERROR: winget unavailable. Install Windows App Installer from Microsoft Store. & goto failed)');
  if(kind==='install'&&needsPython){
@@ -82,11 +82,11 @@ function script(p,kind){
   lines.push('py -3.13 -m ensurepip --upgrade','if errorlevel 1 goto failed');
  }
  let run=cmd;
- if(needsPython)run=cmd.replace(/\\bpy -m /g,'py -3.13 -m ');
- if(p[0]==='typescript')run=cmd.replace(/\\bnpm /g,'npm.cmd ');
+ if(needsPython)run=cmd.replace(/\bpy -m /g,'py -3.13 -m ');
+ if(p[0]==='typescript')run=cmd.replace(/\bnpm /g,'npm.cmd ');
  if(p[0]==='msys2'&&kind==='install')run='winget install --id MSYS2.MSYS2 -e --accept-package-agreements --accept-source-agreements && if exist "C:\\msys64\\usr\\bin\\bash.exe" ("C:\\msys64\\usr\\bin\\bash.exe" -lc "pacman -Sy --noconfirm mingw-w64-ucrt-x86_64-gcc") else (echo MSYS2 shell not found; reopen terminal and finish installation. & exit /b 1)';
  lines.push(run,'if errorlevel 1 goto failed','echo Installation command completed.','set "result=0"','goto finish',':failed','echo Installation failed. Review prerequisites and command output.','set "result=1"',':finish','echo Exit code: %result%','pause','exit /b %result%');
- return lines.join('\\r\\n')+'\\r\\n';
+ return lines.join('\r\n')+'\r\n';
 }
 function download(p,kind){const blob=new Blob([script(p,kind)],{type:'application/octet-stream'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=p[0]+'-'+kind+'.cmd';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 const searchAliases={"python":"python py py3 pip venv","git":"git version control","node":"javascript js node npm web","cmake":"c cpp c++ cmake","ninja":"c cpp c++ build ninja","msys2":"c cpp c++ gcc g++ mingw compiler","java":"java jave jdk javac","arduino":"arduino c cpp embedded","nano":"arduino nano ble nrf52840 c cpp","esp32":"esp32 arduino c cpp","pyserial":"python serial uart","clang":"c cpp c++ clang llvm compiler","dotnet":"c# csharp dotnet asp.net","go":"golang go","rust":"rust rustlang cargo","powershell7":"powershell ps pwsh","gh":"github gh","vscode":"editor vscode ide","esptool":"esp32 esp8266 python esptool","pytest":"python testing pytest","black":"python formatter black","ruff":"python linter ruff","jupyter":"python notebook data science","platformio":"arduino esp32 embedded python platformio","docker":"container docker","typescript":"typescript ts javascript node","openocd":"openocd c cpp embedded jtag debug","postman":"api http postman"};
