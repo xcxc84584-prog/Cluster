@@ -5,7 +5,7 @@ Write-Host 'The endpoint requires a separate bearer token. Do not share it.'
 $updater=Join-Path $env:TEMP ('Cluster-MCP-Update-'+[guid]::NewGuid().ToString('N')+'.ps1')
 try {
  Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/main/tools/mcp/Update-Cluster-MCP.ps1' -OutFile $updater -ErrorAction Stop
- & $updater
+ & $updater -AllowStopClusterServices
  if(-not $?){throw 'MCP component update failed'}
 } finally {Remove-Item -LiteralPath $updater -Force -ErrorAction SilentlyContinue}
 $base=Join-Path $env:LOCALAPPDATA 'ClusterTerminalAgent'
