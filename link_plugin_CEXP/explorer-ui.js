@@ -14,11 +14,32 @@
    shell.append(panel,right);right.append(tabbar,workarea);
   }
  }
+
+ // Optional Windows paths: browser handles never expose native absolute paths.
+ const pathKey='cluster-explorer-windows-paths-v1';
+ const getPaths=()=>{try{return JSON.parse(localStorage.getItem(pathKey)||'{}')}catch{return {}}};
+ window.ClusterExplorerWindowsPaths={get:name=>getPaths()[name]||'',set:(name,value)=>{const paths=getPaths();paths[name]=value;localStorage.setItem(pathKey,JSON.stringify(paths))}};
+ async function requestWindowsPath(name,kind){
+  const en=document.getElementById('uiLanguage')?.value==='en',tr=(zh,english)=>en?english:zh;
+  return new Promise(resolve=>{
+   const overlay=document.createElement('div');overlay.className='cexp-path-overlay';
+   const card=document.createElement('section');card.className='cexp-path-dialog';card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');
+   const title=document.createElement('strong');title.textContent=tr('登記 Windows 絕對路徑','Register Windows absolute path');
+   const x=document.createElement('button');x.textContent='[x]';x.className='cexp-path-x';x.setAttribute('aria-label',tr('關閉','Close'));
+   const description=document.createElement('p');description.textContent=tr('選填：輸入「'+name+'」的 Windows 絕對路徑，供 AI Agent 定位。可直接略過。','Optional: enter the Windows absolute path for "'+name+'" to enable AI Agent path lookup. You may skip.');
+   const input=document.createElement('input');input.type='text';input.value=window.ClusterExplorerWindowsPaths.get(name);input.placeholder=kind==='directory'?'C:\\Users\\Owner\\Desktop\\test':'C:\\Users\\Owner\\Desktop\\test\\file.cpp';
+   const error=document.createElement('small');error.setAttribute('role','alert');
+   const actions=document.createElement('div');actions.className='cexp-path-actions';const skip=document.createElement('button');skip.textContent=tr('略過','Skip');const save=document.createElement('button');save.textContent=tr('確認','Confirm');
+   const finish=()=>{document.removeEventListener('keydown',esc);overlay.remove();resolve()};const esc=ev=>{if(ev.key==='Escape')finish()};document.addEventListener('keydown',esc);x.onclick=skip.onclick=finish;overlay.onclick=ev=>{if(ev.target===overlay)finish()};
+   save.onclick=()=>{const value=input.value.trim();const valid=/^[A-Za-z]:\\/.test(value)&&!/[<>:"|?*]/.test(value.slice(2))&&!value.slice(3).split('\\').some(part=>part==='.'||part==='..');if(!valid){error.textContent=tr('路徑格式不正確，例如 C:\\Users\\Owner\\Desktop\\test','Invalid path. Example: C:\\Users\\Owner\\Desktop\\test');return;}window.ClusterExplorerWindowsPaths.set(name,value);finish()};
+   actions.append(skip,save);card.append(title,x,description,input,error,actions);overlay.append(card);document.body.append(overlay);input.focus();
+  });
+ }
  function toggle(open){panel.hidden=!open;document.body.classList.toggle('cexp-open',open);window.dispatchEvent(new Event('resize'));requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));$('cexpToggle').setAttribute('aria-expanded',String(open));if(open){$('blockDirectory').hidden=true;$('blockDirectoryButton').setAttribute('aria-expanded','false');}}
  $('cexpToggle').addEventListener('click',()=>toggle(panel.hidden));$('cexpClose').addEventListener('click',()=>toggle(false));
- $('cexpAddRoot').addEventListener('click',async()=>{try{if(!window.showDirectoryPicker)throw Error('請使用支援 File System Access API 的 Chromium 瀏覽器');const h=await showDirectoryPicker({mode:'readwrite'});await api.addRoot(h);setStatus('已加入 '+h.name);}catch(e){if(e.name!=='AbortError')setStatus(e.message,true);}});
+ $('cexpAddRoot').addEventListener('click',async()=>{try{if(!window.showDirectoryPicker)throw Error('請使用支援 File System Access API 的 Chromium 瀏覽器');const h=await showDirectoryPicker({mode:'readwrite'});await api.addRoot(h);setStatus('已加入 '+h.name);await requestWindowsPath(h.name,'directory');}catch(e){if(e.name!=='AbortError')setStatus(e.message,true);}});
  // [ADD-OPT4-002] Add a single file without requiring a folder root.
- $('cexpAddFile').addEventListener('click',async()=>{try{if(!window.showOpenFilePicker)throw Error('瀏覽器不支援本地檔案 Handle');const [handle]=await window.showOpenFilePicker({multiple:false});if(!handle)return;await api.addFile(handle);await window.ClusterExplorerHost.openHandle(handle);setStatus('已加入獨立檔案 '+handle.name);}catch(e){if(e.name!=='AbortError')setStatus(e.message,true);}});
+ $('cexpAddFile').addEventListener('click',async()=>{try{if(!window.showOpenFilePicker)throw Error('瀏覽器不支援本地檔案 Handle');const [handle]=await window.showOpenFilePicker({multiple:false});if(!handle)return;await api.addFile(handle);await window.ClusterExplorerHost.openHandle(handle);setStatus('已加入獨立檔案 '+handle.name);await requestWindowsPath(handle.name,'file');}catch(e){if(e.name!=='AbortError')setStatus(e.message,true);}});
  // [FIX-OPT9-001] Refresh is an explicit collapse operation; never close editor tabs.
  // Suppress automatic active-file reveal until a later tab activation.
  $('cexpRefresh').addEventListener('click',async()=>{
