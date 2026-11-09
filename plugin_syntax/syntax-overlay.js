@@ -71,25 +71,26 @@ function setupSyntaxPage(){
    const close=document.createElement('button');close.type='button';close.className='tab-close';close.textContent='×';close.onclick=closePage;
    tab.append(open,close);tabs.append(tab);
   }
-  if(tab)tab.classList.toggle('is-active',pageActive);
+  if(tab){tab.classList.toggle('is-active',pageActive);window.ClusterTabOrder?.apply?.();}
   page.hidden=!pageActive;
   if(pageActive){shell.hidden=true;empty.hidden=true;document.getElementById('clusterBottomBar').hidden=true}
  }
  function activate(){
-  pageOpened=true;pageActive=true;window.ClusterTerminal?.deactivate?.();window.ClusterAI?.deactivate?.();
+  pageOpened=true;pageActive=true;window.ClusterTerminal?.deactivate?.();window.ClusterAI?.deactivate?.();window.ClusterDevelopmentEnvironment?.deactivate?.();window.ClusterAgentPermissions?.deactivate?.();document.querySelectorAll('#tabList .tab').forEach(t=>t.classList.remove('is-active'));
   document.getElementById('fileMenu').hidden=true;sync();
  }
  function deactivate(){
   pageActive=false;page.hidden=true;
   const tab=tabs.querySelector('[data-tab-key="plugin:syntax"]');tab?.classList.remove('is-active');
-  const other=!!document.body.classList.contains('cluster-terminal-active')||!!window.ClusterAI?.isActive?.();
+  const other=!!document.body.classList.contains('cluster-terminal-active')||!!window.ClusterAI?.isActive?.()||!!window.ClusterAgentPermissions?.isActive?.();
   shell.hidden=other||!window.cluster?.fm?.active;
   empty.hidden=other||!!window.cluster?.fm?.active;
   document.getElementById('clusterBottomBar').hidden=other||!window.cluster?.fm?.active;
  }
  function closePage(){pageOpened=false;deactivate();tabs.querySelector('[data-tab-key="plugin:syntax"]')?.remove();}
  button.onclick=activate;translateSyntaxUI();
- window.ClusterSyntaxPage={activate,deactivate,sync};
+ window.ClusterSyntaxPage={activate,deactivate,sync,close:closePage,isActive:()=>pageActive};
+ window.cluster?.fm?.onChange?.(()=>{if(pageOpened)sync();});
 }
 function setupTools(){
  const input=document.getElementById('syntaxExtInput'),select=document.getElementById('syntaxLangSelect');
