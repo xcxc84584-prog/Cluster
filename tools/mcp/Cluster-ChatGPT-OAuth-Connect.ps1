@@ -4,15 +4,13 @@ Write-Host 'This creates a temporary OAuth HTTPS endpoint for testing. Keep this
 $base=Join-Path $env:LOCALAPPDATA 'ClusterTerminalAgent'
 $gateway=Join-Path $base 'app\oauth-mcp-gateway.cjs'
 if(!(Test-Path -LiteralPath (Split-Path $gateway))){New-Item -ItemType Directory -Path (Split-Path $gateway) -Force | Out-Null}
-Write-Host 'Installing Cluster OAuth Gateway P3.8.4...' -ForegroundColor Cyan
-$gatewayDownload=$gateway+'.update.cjs'
-Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/75930168f57e86c895d3e187bda1fd1252f4ebb8/agent_terminal/oauth-mcp-gateway.cjs' -OutFile $gatewayDownload
-
-$node=(Get-Command node.exe -ErrorAction SilentlyContinue)
-if(!$node){throw 'Node.js 20+ is required.'}
-& $node.Source --check $gatewayDownload
-if($LASTEXITCODE -ne 0){throw 'Updated OAuth Gateway syntax check failed.'}
-Move-Item -LiteralPath $gatewayDownload -Destination $gateway -Force
+$node=(Get-Command node.exe -ErrorAction Stop)
+$updater=Join-Path $env:TEMP ('Cluster-MCP-Update-'+[guid]::NewGuid().ToString('N')+'.ps1')
+try {
+ Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/xcxc84584-prog/Cluster/main/tools/mcp/Update-Cluster-MCP.ps1' -OutFile $updater -ErrorAction Stop
+ & $updater
+ if(-not $?){throw 'MCP component update failed'}
+} finally {Remove-Item -LiteralPath $updater -Force -ErrorAction SilentlyContinue}
 $cloud=$null
 foreach($candidate in @('C:\Program Files (x86)\cloudflared\cloudflared.exe','C:\Program Files\cloudflared\cloudflared.exe',"$env:LOCALAPPDATA\Microsoft\WinGet\Links\cloudflared.exe")){
  if(Test-Path -LiteralPath $candidate -PathType Leaf){$cloud=$candidate;break}
