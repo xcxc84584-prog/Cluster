@@ -373,3 +373,19 @@ html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-action.primary{ba
 html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-action.primary:hover{background:#174d91!important;color:#fff!important}
 html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-action:disabled{background:#e5ebf3!important;color:#435c79!important;opacity:1!important}
 html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-command{background:#eaf1fa!important;color:#19385e!important;border-color:#bacbe0!important}
+
+/* Security Center actual DOM: injected by permissions-ui.js (style appended at runtime). */
+html[data-cluster-theme="light"] #clusterAgentPermissions{background:#f4f7fc!important;color:#182e4a!important}
+html[data-cluster-theme="light"] #clusterAgentPermissions .cap-head{border-color:#c2d1e4!important}
+html[data-cluster-theme="light"] #clusterAgentPermissions .cap-eyebrow{color:#1c5ba7!important}
+html[data-cluster-theme="light"] #clusterAgentPermissions .cap-title,
+html[data-cluster-theme="light"] #clusterAgentPermissions .cap-card h3{color:#172f4d!important}
+html[data-cluster-theme="light"] #clusterAgentPermissions :is(.cap-sub,.cap-note,.cap-row small){color:#405b7a!important;opacity:1!important}
+html[data-cluster-theme="light"] #clusterAgentPermissions .cap-card{background:#fff!important;color:#192f4c!important;border:1px solid #bdcee2!important;box-shadow:0 5px 22px #233c5c12!important}
+html[data-cluster-theme="light"] #clusterAgentPermissions .cap-row{color:#1c3554!important;border-color:#d5e0ec!important}
+html[data-cluster-theme="light"] #clusterAgentPermissions .cap-row span,
+html[data-cluster-theme="light"] #clusterAgentPermissions .cap-row strong{color:#1c3554!important}
+html[data-cluster-theme="light"] #clusterAgentPermissions .cap-note{border-left-color:#2867b5!important}
+html[data-cluster-theme="light"] #clusterAgentPermissions :is(.cap-pill,.cap-state){background:#eaf2fc!important;color:#204c80!important;border-color:#b4cae3!important}
+html[data-cluster-theme="light"] #clusterAgentPermissions .cap-nav button{color:#1c426d!important}
+html[data-cluster-theme="light"] #clusterAgentPermissions .cap-nav button.active{background:#d9e9fc!important;color:#153f77!important;border-color:#9ebce0!important}
