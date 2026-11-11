@@ -47,3 +47,39 @@ header #projectToolMenu button:hover{background:#303137!important}
 #clusterBackupPage .cb-item small{font-size:11px}
 #clusterBackupPage .cb-head button,#clusterBackupPage .cb-toolbar button,#clusterBackupPage .cb-item button{border-radius:7px!important;background:#26272c!important}
 @media(max-width:750px){.app > header{gap:5px!important}.app > header #projectToolButton,.app > header #cbSubmitButton,.app > header #fileButton,.app > header #blockDirectoryButton{padding:0 7px!important;font-size:10px!important}#clusterBackupPage .cb-shell{width:calc(100% - 28px);padding-top:20px}#clusterBackupPage .cb-head{flex-wrap:wrap}}
+
+/* DPR: Project Tool inherits the Explorer button's exact visual rules. */
+.app > header #projectToolButton{
+  height:auto!important;min-height:28px!important;
+  padding:5px 10px!important;
+  border:1px solid #41434a!important;
+  border-radius:6px!important;
+  background:#242529!important;
+  color:#dedfe4!important;
+  font:600 11px/1.2 system-ui,sans-serif!important;
+  letter-spacing:normal!important;
+  box-shadow:none!important;
+  gap:5px!important;
+}
+.app > header #projectToolButton:hover,
+.app > header #projectToolButton[aria-expanded="true"]{
+  background:#37383e!important;border-color:#777980!important;color:#fff!important;
+}
+.app > header #projectToolButton:focus-visible{
+  outline:2px solid #ddd;outline-offset:2px;
+}
+/* Backup history is always a vertical list, irrespective of viewport width. */
+#clusterBackupPage .cb-list{
+  display:flex!important;flex-direction:column!important;
+  grid-template-columns:none!important;
+  gap:8px!important;width:100%!important;
+}
+#clusterBackupPage .cb-item{
+  width:100%!important;min-height:66px!important;
+  box-sizing:border-box!important;
+  display:flex!important;align-items:center!important;
+  justify-content:space-between!important;
+  padding:12px 16px!important;
+}
+#clusterBackupPage .cb-item>div{flex:1;min-width:0}
+#clusterBackupPage .cb-item>button{flex:0 0 auto;margin-left:16px}
