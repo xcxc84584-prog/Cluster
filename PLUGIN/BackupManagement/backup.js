@@ -56,7 +56,7 @@ async function restore(id,force=false){
   rollbackPaths=currentPaths;
   await writeText(safety,'rollback-manifest.json',JSON.stringify({paths:currentPaths,target:id,status:'prepared',created:new Date().toISOString()}));
   // A prepared rollback snapshot must be validated before any project mutation.
-  for(const e of current){const original=await e.handle.getFile(),copy=await bytesFor(safety,e.path);if(await sha(original)!==await sha(copy))throw Error('ROLLBACK_PREPARE_MISMATCH: '+e.path)}
+  for(const e of current){const original=await e.handle.getFile(),copy=await bytesFor(safety,e.path);if((await fingerprint(original)).hash!==(await fingerprint(copy)).hash)throw Error('ROLLBACK_PREPARE_MISMATCH: '+e.path)}
   await writeText(safety,'rollback-manifest.json',JSON.stringify({paths:currentPaths,target:id,status:'applying',created:new Date().toISOString()}));
   mutationStarted=true;
   let i=0;
@@ -80,7 +80,7 @@ async function restore(id,force=false){
     for(const p of rollbackPaths)await putBytes(root,p,await bytesFor(safety,p));
     const restored=await walk(root);
     if(restored.length!==rollbackPaths.length)throw Error('ROLLBACK_COUNT_MISMATCH');
-    for(const entry of restored){const saved=await bytesFor(safety,entry.path);if(await sha(await entry.handle.getFile())!==await sha(saved))throw Error('ROLLBACK_HASH_MISMATCH: '+entry.path)}
+    for(const entry of restored){const saved=await bytesFor(safety,entry.path);if((await fingerprint(await entry.handle.getFile())).hash!==(await fingerprint(saved)).hash)throw Error('ROLLBACK_HASH_MISMATCH: '+entry.path)}
     await writeText(safety,'rollback-manifest.json',JSON.stringify({paths:rollbackPaths,status:'rolled-back'}));
    }catch(rollbackError){fail(new Error('RESTORE_FAILED_AND_ROLLBACK_FAILED: '+e.message+' / '+rollbackError.message));busy=false;jobType=null;return}
   }
