@@ -19,14 +19,26 @@ function dialog(title,hint){$('cbDialogTitle').textContent=title;$('cbDialogHint
 function addChoice(label,fn){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;$('cbChoices').append(b)}
 function safeName(s){if(!s||s==='.'||s==='..'||s.includes('/')||s.includes('\\'))throw Error('Invalid path');return s}
 async function dir(parent,name,create=false){return parent.getDirectoryHandle(safeName(name),{create})}
-async function file(parent,name,create=false){return parent.getFileHandle(safeName(name),{create})}
+async function file(parent,name,create=false){
+ const checked=safeName(name);
+ try{return await parent.getFileHandle(checked,{create})}
+ catch(e){
+  if(e.name==='SecurityError')throw new Error('FILE_SYSTEM_SECURITY_DENIED: '+checked+' ('+(create?'write':'read')+'). Browser blocked this file name or location; no bypass attempted. '+e.message);
+  throw e;
+ }
+}
 async function readText(d,n){return (await (await file(d,n)).getFile()).text()}
 async function writeText(d,n,s){const h=await file(d,n,true),w=await h.createWritable();try{await w.write(s);await w.close()}catch(e){await w.abort().catch(()=>{});throw e}}
 async function sha(blob){const bytes=blob instanceof Blob?await blob.arrayBuffer():blob;const hash=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 async function walk(d,prefix='',out=[]){for await(const [name,h] of d.entries()){if(!prefix&&name===folder)continue;const p=prefix+name;if(h.kind==='directory')await walk(h,p+'/',out);else out.push({path:p,handle:h})}return out.sort((a,b)=>a.path.localeCompare(b.path))}
 async function locate(d,path,create=false){const bits=path.split('/');let x=d;for(const part of bits.slice(0,-1))x=await dir(x,part,create);return {parent:x,name:bits.at(-1)}}
 async function bytesFor(d,path){const {parent,name}=await locate(d,path);return (await file(parent,name)).getFile()}
-async function putBytes(d,path,blob){const {parent,name}=await locate(d,path,true),h=await file(parent,name,true),w=await h.createWritable();try{await w.write(blob);await w.close()}catch(e){await w.abort().catch(()=>{});throw e}}
+async function putBytes(d,path,blob){
+ try{
+  const {parent,name}=await locate(d,path,true),h=await file(parent,name,true),w=await h.createWritable();
+  try{await w.write(blob);await w.close()}catch(e){await w.abort().catch(()=>{});throw e}
+ }catch(e){throw new Error('FILE_WRITE_FAILED ['+path+']: '+e.message)}
+}
 async function removePath(d,path){try{const {parent,name}=await locate(d,path);await parent.removeEntry(name)}catch(e){if(e.name!=='NotFoundError')throw e}}
 async function store(){if(!root)throw Error(tr('請先選擇專案資料夾','Choose a project folder first'));let d;try{d=await dir(root,folder)}catch(e){if(e.name!=='NotFoundError')throw e;d=await dir(root,folder,true);const t={magic,projectId:crypto.randomUUID(),created:new Date().toISOString()};await writeText(d,tokenFile,JSON.stringify(t));await writeText(d,'manifest.json',JSON.stringify({magic,projectId:t.projectId,commits:[]},null,2));}
 let token,manifest;try{token=JSON.parse(await readText(d,tokenFile));manifest=JSON.parse(await readText(d,'manifest.json'))}catch{throw Error(tr('備份功能遭到拒絕,專案中存在未經授權的backup_cluster文件夾','Backup denied: unauthorized backup_cluster folder exists'))}
