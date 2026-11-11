@@ -273,3 +273,18 @@ html[data-cluster-theme="light"] .block-directory-rename:hover,
 html[data-cluster-theme="light"] .block-directory-delete:hover{background:#d5e6fc!important;color:#123b70!important}
 html[data-cluster-theme="light"] .block-directory-input{background:#fff!important;color:#182d48!important;border-color:#9bb3d0!important}
 html[data-cluster-theme="light"] .block-directory :is(button,summary):focus-visible{outline:2px solid #2362ad!important;outline-offset:2px}
+
+/* DPR light theme: backup progress bar and block-directory inline rename. */
+html[data-cluster-theme="light"] #clusterBackupPage .cb-track,
+html[data-cluster-theme="light"] #cbDialog .cb-track{height:5px!important;background:#d4e0ee!important;border:1px solid #b8cbe0!important;border-radius:99px!important;overflow:hidden!important}
+html[data-cluster-theme="light"] #clusterBackupPage .cb-track>div,
+html[data-cluster-theme="light"] #cbDialog .cb-track>div{height:100%!important;background:#2464b3!important;border-radius:99px!important;transition:width .16s ease!important}
+html[data-cluster-theme="light"] #clusterBackupPage :is(#cbMessage,#cbRoot),
+html[data-cluster-theme="light"] #cbDialog #cbModalStatus{color:#24415f!important;opacity:1!important}
+html[data-cluster-theme="light"] .block-directory-row:has(.block-directory-input){background:#eaf2fd!important;border-color:#83a8d5!important}
+html[data-cluster-theme="light"] .block-directory .block-directory-input{background:#fff!important;color:#172e4b!important;border:1px solid #739bc8!important;box-shadow:0 0 0 2px #cfe2fa!important;caret-color:#172e4b!important;opacity:1!important}
+html[data-cluster-theme="light"] .block-directory .block-directory-input::placeholder{color:#4b617d!important;opacity:1!important}
+html[data-cluster-theme="light"] .block-directory .block-directory-input:focus{outline:2px solid #2563ae!important;outline-offset:1px!important}
+html[data-cluster-theme="light"] .block-directory .block-directory-rename{background:#dceafc!important;color:#173e73!important;border:1px solid #93b1d5!important;opacity:1!important}
+html[data-cluster-theme="light"] .block-directory .block-directory-rename:hover,
+html[data-cluster-theme="light"] .block-directory .block-directory-rename:focus-visible{background:#c6dfff!important;color:#10376d!important}
