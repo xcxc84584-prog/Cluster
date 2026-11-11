@@ -16,7 +16,34 @@ foreach($candidate in @('C:\Program Files (x86)\cloudflared\cloudflared.exe','C:
  if(Test-Path -LiteralPath $candidate -PathType Leaf){$cloud=$candidate;break}
 }
 if(!$cloud){$cmd=Get-Command cloudflared.exe -ErrorAction SilentlyContinue;if($cmd){$cloud=$cmd.Source}}
-if(!$cloud){throw 'cloudflared.exe not found. Run Cluster-MCP-OneClick.cmd first.'}
+if(!$cloud){
+ Write-Host 'cloudflared.exe was not found in the known locations or PATH.' -ForegroundColor Yellow
+ $winget=Get-Command winget.exe -ErrorAction SilentlyContinue
+ if(!$winget){throw 'cloudflared.exe is missing and winget is unavailable. Install Cloudflare cloudflared from the official release and retry.'}
+ $answer=Read-Host 'Install Cloudflare cloudflared using winget now? (Y/N)'
+ if($answer -notin @('Y','y')){throw 'cloudflared installation declined. OAuth connection was not started.'}
+ & $winget.Source install --id Cloudflare.cloudflared --exact --source winget --accept-source-agreements --accept-package-agreements
+ if($LASTEXITCODE -ne 0){throw ('cloudflared installation failed (winget exit code '+$LASTEXITCODE+').')}
+ foreach($candidate in @(
+  'C:\Program Files (x86)\cloudflared\cloudflared.exe',
+  'C:\Program Files\cloudflared\cloudflared.exe',
+  "$env:LOCALAPPDATA\Microsoft\WinGet\Links\cloudflared.exe",
+  "$env:LOCALAPPDATA\Programs\cloudflared\cloudflared.exe"
+ )){
+  if(Test-Path -LiteralPath $candidate -PathType Leaf){$cloud=$candidate;break}
+ }
+ if(!$cloud){$cmd=Get-Command cloudflared.exe -ErrorAction SilentlyContinue;if($cmd){$cloud=$cmd.Source}}
+ if(!$cloud){
+  $packageRoot=Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages'
+  if(Test-Path -LiteralPath $packageRoot){
+   $matches=@(Get-ChildItem -LiteralPath $packageRoot -Directory -Filter 'Cloudflare.cloudflared_*' -ErrorAction SilentlyContinue |
+    ForEach-Object {Get-ChildItem -LiteralPath $_.FullName -File -Filter cloudflared.exe -Recurse -ErrorAction SilentlyContinue})
+   if($matches.Count -gt 0){$cloud=$matches[0].FullName}
+  }
+ }
+ if(!$cloud){throw 'cloudflared was installed but the executable could not be located. Reopen the terminal and retry.'}
+}
+Write-Host ('cloudflared ready: '+$cloud) -ForegroundColor Green
 try{
  $local=Invoke-RestMethod 'http://127.0.0.1:43880/mcp' -Method Post -ContentType 'application/json' -Body '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' -TimeoutSec 4
  throw 'Local MCP accepted unauthenticated request; refusing to publish OAuth bridge.'
