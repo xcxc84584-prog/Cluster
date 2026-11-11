@@ -30,7 +30,19 @@ async function file(parent,name,create=false){
 async function readText(d,n){return (await (await file(d,n)).getFile()).text()}
 async function writeText(d,n,s){const h=await file(d,n,true),w=await h.createWritable();try{await w.write(s);await w.close()}catch(e){await w.abort().catch(()=>{});throw e}}
 async function sha(blob){const bytes=blob instanceof Blob?await blob.arrayBuffer():blob;const hash=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,'0')).join('')}
-async function walk(d,prefix='',out=[]){for await(const [name,h] of d.entries()){if(!prefix&&name===folder)continue;const p=prefix+name;if(h.kind==='directory')await walk(h,p+'/',out);else out.push({path:p,handle:h})}return out.sort((a,b)=>a.path.localeCompare(b.path))}
+// Never access Git internals through browser file handles. Exclude at any nesting depth.
+function protectedPath(path){return path.split('/').some(part=>part.toLowerCase()==='.git')}
+function safeRestoreState(state){return Object.fromEntries(Object.entries(state).filter(([path])=>!protectedPath(path)))}
+async function walk(d,prefix='',out=[]){
+ for await(const [name,h] of d.entries()){
+  if(!prefix&&name===folder)continue;
+  if(h.kind==='directory'&&name.toLowerCase()==='.git')continue;
+  const p=prefix+name;
+  if(h.kind==='directory')await walk(h,p+'/',out);
+  else if(!protectedPath(p))out.push({path:p,handle:h});
+ }
+ return out.sort((a,b)=>a.path.localeCompare(b.path));
+}
 async function locate(d,path,create=false){const bits=path.split('/');let x=d;for(const part of bits.slice(0,-1))x=await dir(x,part,create);return {parent:x,name:bits.at(-1)}}
 async function bytesFor(d,path){const {parent,name}=await locate(d,path);return (await file(parent,name)).getFile()}
 async function putBytes(d,path,blob){
@@ -50,8 +62,8 @@ async function readObject(d,v){if(!v.chunks)return bytesFor(d,'objects/'+v.hash)
 async function snapshot(){checkpoint();const entries=await walk(root),files={};let i=0;for(const entry of entries){checkpoint();const f=await entry.handle.getFile();files[entry.path]=await fingerprint(f);progress(Math.round(++i/Math.max(1,entries.length)*40),tr('掃描檔案','Scanning files')+' '+i+'/'+entries.length)}return {entries,files}}
 async function reconstruct(d,manifest,id){const commits=manifest.commits;const target=commits.findIndex(x=>x.id===id);if(target<0)throw Error('Missing commit');let base=-1;for(let i=target;i>=0;i--)if(commits[i].type==='full'){base=i;break}if(base<0)throw Error('Full snapshot missing');const state=Object.create(null);for(let i=base;i<=target;i++){const c=commits[i];if(c.type==='differential'){for(const k of Object.keys(state))delete state[k];Object.assign(state,commits[base].files);for(const p of c.deleted||[])delete state[p];Object.assign(state,c.files);continue}for(const p of c.deleted||[])delete state[p];Object.assign(state,c.files)}return state}
 async function verify(d,state){let i=0;for(const [p,v] of Object.entries(state)){const f=await readObject(d,v);const actual=await fingerprint(f);if(actual.hash!==v.hash||actual.size!==v.size)throw Error('HASH_MISMATCH: '+p);progress(60+Math.round(++i/Math.max(1,Object.keys(state).length)*30),tr('驗證還原鏈','Verifying restore chain')+' '+i)}return true}
-async function commitUnlocked(type){if(busy)return;busy=true;cancelRequested=false;jobType='commit';try{const {d,manifest}=await store();if(await guardRecovery(d))return;if(!manifest.commits.length&&type!=='full')throw Error(tr('首次提交必須為完整提交','First commit must be full'));const {entries,files}=await snapshot();const previous=manifest.commits.at(-1);const full=type==='full';const reference=full?{}:await reconstruct(d,manifest,type==='differential'?[...manifest.commits].reverse().find(c=>c.type==='full').id:previous.id);const changed=Object.fromEntries(Object.entries(files).filter(([p,v])=>!reference[p]||reference[p].hash!==v.hash));const deleted=Object.keys(reference).filter(p=>!files[p]);const objects=await dir(d,'objects',true);let i=0;for(const entry of entries.filter(e=>changed[e.path])){checkpoint();const f=await entry.handle.getFile(),v=files[entry.path],h=v.hash;if((await fingerprint(f)).hash!==h)throw Error('SOURCE_CHANGED_DURING_BACKUP: '+entry.path);if(v.chunks){for(let off=0,index=0;off<f.size;off+=CHUNK,index++){checkpoint();const hash=v.chunks[index];try{await file(objects,hash)}catch(e){if(e.name!=='NotFoundError')throw e;await putBytes(d,'objects/'+hash,f.slice(off,off+CHUNK))}}}else{try{await file(objects,h)}catch(e){if(e.name!=='NotFoundError')throw e;await putBytes(d,'objects/'+h,f)}}progress(40+Math.round(++i/Math.max(1,Object.keys(changed).length)*20),tr('寫入備份','Writing backup')+' '+i)}
-const id=new Date().toISOString().replace(/[:.]/g,'-')+'-'+crypto.randomUUID().slice(0,8);const c={id,type,time:new Date().toISOString(),parent:previous?.id||null,files:changed,deleted};const candidate={...manifest,commits:[...manifest.commits,c]};const state=await reconstruct(d,candidate,id);if(Object.keys(state).length!==Object.keys(files).length||Object.entries(files).some(([p,v])=>state[p]?.hash!==v.hash))throw Error('RESTORE_STATE_MISMATCH');await verify(d,state);checkpoint();await writeText(d,'manifest.json',JSON.stringify(candidate,null,2));progress(100,tr('提交成功 · 還原測試通過','Commit successful · Restore verification passed'));closeModal();await refresh(false)}catch(e){fail(e)}finally{busy=false;jobType=null;cancelRequested=false}}
+async function commitUnlocked(type){if(busy)return;busy=true;cancelRequested=false;jobType='commit';try{const {d,manifest}=await store();if(await guardRecovery(d))return;if(!manifest.commits.length&&type!=='full')throw Error(tr('首次提交必須為完整提交','First commit must be full'));const {entries,files}=await snapshot();const previous=manifest.commits.at(-1);const full=type==='full';const reference=full?{}:safeRestoreState(await reconstruct(d,manifest,type==='differential'?[...manifest.commits].reverse().find(c=>c.type==='full').id:previous.id));const changed=Object.fromEntries(Object.entries(files).filter(([p,v])=>!reference[p]||reference[p].hash!==v.hash));const deleted=Object.keys(reference).filter(p=>!files[p]);const objects=await dir(d,'objects',true);let i=0;for(const entry of entries.filter(e=>changed[e.path])){checkpoint();const f=await entry.handle.getFile(),v=files[entry.path],h=v.hash;if((await fingerprint(f)).hash!==h)throw Error('SOURCE_CHANGED_DURING_BACKUP: '+entry.path);if(v.chunks){for(let off=0,index=0;off<f.size;off+=CHUNK,index++){checkpoint();const hash=v.chunks[index];try{await file(objects,hash)}catch(e){if(e.name!=='NotFoundError')throw e;await putBytes(d,'objects/'+hash,f.slice(off,off+CHUNK))}}}else{try{await file(objects,h)}catch(e){if(e.name!=='NotFoundError')throw e;await putBytes(d,'objects/'+h,f)}}progress(40+Math.round(++i/Math.max(1,Object.keys(changed).length)*20),tr('寫入備份','Writing backup')+' '+i)}
+const id=new Date().toISOString().replace(/[:.]/g,'-')+'-'+crypto.randomUUID().slice(0,8);const c={id,type,time:new Date().toISOString(),parent:previous?.id||null,files:changed,deleted};const candidate={...manifest,commits:[...manifest.commits,c]};const state=safeRestoreState(await reconstruct(d,candidate,id));if(Object.keys(state).length!==Object.keys(files).length||Object.entries(files).some(([p,v])=>state[p]?.hash!==v.hash))throw Error('RESTORE_STATE_MISMATCH');await verify(d,state);checkpoint();await writeText(d,'manifest.json',JSON.stringify(candidate,null,2));progress(100,tr('提交成功 · 還原測試通過','Commit successful · Restore verification passed'));closeModal();await refresh(false)}catch(e){fail(e)}finally{busy=false;jobType=null;cancelRequested=false}}
 async function commit(type){
  if(!navigator.locks?.request)return fail(new Error('WEB_LOCKS_UNAVAILABLE'));
  const {manifest}=await store();
@@ -115,6 +127,7 @@ async function recoverRollbackUnlocked(){
   if(!['prepared','applying','verifying','deleting'].includes(journal.status))throw Error('UNKNOWN_RESTORE_STATE');
   // Original paths are preserved even when a previous attempt stopped halfway.
   for(const [path,v] of Object.entries(journal.originals||{})){
+   if(protectedPath(path))throw Error('PROTECTED_GIT_RECOVERY_PATH: '+path);
    const saved=await bytesFor(safety,path);
    const fp=await fingerprint(saved);
    if(fp.hash!==v.hash||fp.size!==v.size)throw Error('RECOVERY_SOURCE_HASH_MISMATCH: '+path);
@@ -124,7 +137,7 @@ async function recoverRollbackUnlocked(){
    const actual=await fingerprint(await bytesFor(root,path));
    if(actual.hash!==v.hash||actual.size!==v.size)throw Error('RECOVERY_VERIFY_FAILED: '+path);
   }
-  for(const path of journal.created||[])await removePath(root,path);
+  for(const path of journal.created||[]){if(protectedPath(path))throw Error('PROTECTED_GIT_RECOVERY_PATH: '+path);await removePath(root,path)}
   journal.status='rolled-back';journal.updated=new Date().toISOString();
   await writeText(safety,'rollback-manifest.json',JSON.stringify(journal));
   await clearPending(d);
@@ -152,7 +165,7 @@ async function restoreUnlocked(id,force=false){
  if(busy)return;busy=true;jobType='restore';
  let safety=null,mutationStarted=false,plan=null,rollbackId=null,storage=null,journal=null;
  try{
-  const {d,manifest}=await store();if(await guardRecovery(d))return;const state=await reconstruct(d,manifest,id);
+  const {d,manifest}=await store();if(await guardRecovery(d))return;const state=safeRestoreState(await reconstruct(d,manifest,id));
   const skipped=[];
   if(!force)await verify(d,state);
   else for(const [path,v] of Object.entries(state)){
