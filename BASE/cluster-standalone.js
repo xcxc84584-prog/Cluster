@@ -512,6 +512,7 @@ async function pollExternal(){if(externalSyncBusy||document.hidden)return;extern
 setInterval(pollExternal,2500);window.addEventListener('focus',pollExternal);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollExternal()});
 
 // P3.4: explicitly opened editor documents only; no filesystem traversal.
+window.ClusterEditorView=Object.freeze({sync:()=>tabs(),hasActive:()=>!!fm.active});
 window.ClusterReadOnlyBridge=Object.freeze({
  listFiles(){return fm.docs.map(d=>({id:d.id,name:d.name,size:d.size,dirty:!!d.dirty,active:fm.active===d}));},
  getEditorState(){return {activeId:fm.active?.id||null,activeName:fm.active?.name||null,openTabs:fm.docs.length};},
