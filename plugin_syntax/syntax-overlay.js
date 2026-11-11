@@ -76,7 +76,7 @@ function setupSyntaxPage(){
   if(pageActive){shell.hidden=true;empty.hidden=true;document.getElementById('clusterBottomBar').hidden=true}
  }
  function activate(){
-  pageOpened=true;pageActive=true;window.ClusterTerminal?.deactivate?.();window.ClusterAI?.deactivate?.();window.ClusterDevelopmentEnvironment?.deactivate?.();window.ClusterAgentPermissions?.deactivate?.();document.querySelectorAll('#tabList .tab').forEach(t=>t.classList.remove('is-active'));
+  pageOpened=true;pageActive=true;window.ClusterTerminal?.deactivate?.();window.ClusterAI?.deactivate?.();window.ClusterBackup?.deactivate?.();window.ClusterDevelopmentEnvironment?.deactivate?.();window.ClusterAgentPermissions?.deactivate?.();document.querySelectorAll('#tabList .tab').forEach(t=>t.classList.remove('is-active'));
   document.getElementById('fileMenu').hidden=true;sync();
  }
  function deactivate(){
