@@ -175,3 +175,22 @@ html[data-cluster-theme="light"] .cluster-terminal-panel{background:#f5f7fa!impo
 html[data-cluster-theme="light"] .terminal-toolbar{background:#fff!important;color:#19314c!important;border-bottom:1px solid #cad6e4!important}
 html[data-cluster-theme="light"] .terminal-output,
 html[data-cluster-theme="light"] .terminal-screen{background:#080b10!important;color:#e6edf6!important}
+
+/* Explorer theme parity: header, tree, selection, tooltips and context actions. */
+html[data-cluster-theme="light"] .cexp-sidebar,
+html[data-cluster-theme="light"] .cexp-sidebar .cexp-head,
+html[data-cluster-theme="light"] .cexp-sidebar #cexpTree,
+html[data-cluster-theme="light"] .cexp-sidebar .cexp-node{color-scheme:light}
+html[data-cluster-theme="light"] .cexp-sidebar :is(.cexp-head,.cexp-heading,.cexp-toolbar,.cexp-status,.cexp-actions,.cexp-inline,.cexp-context-menu,.cexp-menu){border-color:#c4d1e2!important}
+html[data-cluster-theme="light"] .cexp-sidebar :is(.cexp-context-menu,.cexp-menu,.cexp-inline){background:#fff!important;color:#20334c!important}
+html[data-cluster-theme="light"] .cexp-sidebar :is(.cexp-context-menu,.cexp-menu) button{background:transparent!important;color:#20334c!important}
+html[data-cluster-theme="light"] .cexp-sidebar :is(.cexp-context-menu,.cexp-menu) button:hover{background:#e3efff!important}
+html[data-cluster-theme="light"] .cexp-sidebar :is(input,select,textarea){background:#fff!important;color:#1b304b!important;border-color:#b6c8df!important}
+html[data-cluster-theme="light"] .cexp-sidebar :is(button,input,select):focus-visible{outline:2px solid #2762ae!important;outline-offset:2px}
+html[data-cluster-theme="light"] .cexp-sidebar .cexp-node.is-selected .cexp-glyph{color:#174c8e!important}
+html[data-cluster-theme="light"] #clusterBackupPage .cb-shell{width:100%!important;max-width:none!important;margin:0!important;box-sizing:border-box!important;background:#f7f9fc!important;box-shadow:none!important}
+html[data-cluster-theme="light"] #clusterBackupPage .cb-head,
+html[data-cluster-theme="light"] #clusterBackupPage .cb-status,
+html[data-cluster-theme="light"] #clusterBackupPage .cb-toolbar,
+html[data-cluster-theme="light"] #clusterBackupPage .cb-list{background:transparent!important}
+html[data-cluster-theme="light"] #clusterBackupPage .cb-item{background:#fff!important;box-shadow:0 1px 3px #1c3b6410!important}
