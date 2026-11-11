@@ -1,1 +1,22 @@
 .cb-page{height:100%;overflow:auto;padding:24px;background:#090e17;color:#dce8f7;box-sizing:border-box;font:13px system-ui,sans-serif}.cb-head{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #2b3b50;padding-bottom:18px}.cb-head small{color:#7799be;letter-spacing:1.5px}.cb-head h2{margin:6px 0;font-size:21px}.cb-head p{color:#96a9c2}.cb-page button,.cb-dialog button,.cb-project-wrap button,#cbSubmitButton{cursor:pointer;background:#172336;color:#dbe9fa;border:1px solid #40536e;border-radius:6px;padding:9px 12px;font:inherit}.cb-page button:hover,.cb-dialog button:hover,.cb-project-wrap button:hover,#cbSubmitButton:hover{background:#253a55;border-color:#719bce}.cb-status{display:flex;justify-content:space-between;gap:12px;margin:16px 0;color:#9cb2cd}.cb-track{height:5px;background:#1b2a3e;border-radius:5px;overflow:hidden;margin:12px 0}.cb-track>div{height:100%;width:0;background:#69a9ed;transition:width .12s}.cb-toolbar{display:flex;gap:10px;margin:20px 0}.cb-list{display:grid;gap:9px}.cb-item{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#111b2a;border:1px solid #2b3d55;border-radius:7px;padding:14px}.cb-item div{display:grid;gap:5px;min-width:0;overflow-wrap:anywhere}.cb-item small{color:#819bb9}.cb-dialog{width:min(450px,calc(100vw - 30px));border:1px solid #4b6484;border-radius:10px;background:#101a29;color:#e4edfa;padding:22px;box-shadow:0 20px 70px #000a}.cb-dialog::backdrop{background:#02060bd0}.cb-dialog-head{display:flex;align-items:center;justify-content:space-between}.cb-dialog-head h3{margin:0}.cb-dialog-head button{font-size:18px}.cb-dialog p{color:#9fb4ce;line-height:1.5}.cb-dialog #cbChoices{display:grid;gap:9px;margin:18px 0}.cb-actions{display:flex;justify-content:flex-end}.cb-project-wrap{position:relative}.cb-project-menu{min-width:220px;background:#111b2a!important;border:1px solid #40536e!important}.cb-project-menu button{display:block;width:100%;text-align:left;background:transparent;border:0;border-radius:4px}.cb-page[hidden]{display:none!important}@media(max-width:700px){.cb-head{flex-wrap:wrap}.cb-item{align-items:flex-start}.cb-item button{flex-shrink:0}}
+/* DPR dark monochrome integration: reuse Cluster header and tab geometry. */
+header .cb-project-wrap{margin-left:0!important;flex:0 0 auto}
+header #cbSubmitButton{margin-left:auto!important}
+header .cb-project-wrap~.menu-wrap{margin-left:0!important}
+header #projectToolButton,header #cbSubmitButton{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-height:28px;height:30px;padding:5px 11px;border:1px solid #41434a;border-radius:6px;background:#242529!important;color:#dedfe4!important;font:600 11px/1.2 system-ui,sans-serif;white-space:nowrap;box-shadow:none}
+header #projectToolButton:hover,header #cbSubmitButton:hover{background:#37383e!important;border-color:#777980}
+header #projectToolMenu{position:absolute;top:calc(100% + 5px);left:0;right:auto;z-index:2000;background:#191a1e!important;border:1px solid #3c3d43!important;border-radius:7px;box-shadow:0 12px 28px #000a}
+header #projectToolMenu button{background:transparent!important;color:#dedfe4!important;border:0!important;padding:10px 13px!important;font:500 12px system-ui,sans-serif}
+header #projectToolMenu button:hover{background:#303137!important}
+.cb-page{background:#15161a!important;color:#e4e4e7!important}
+.cb-head{border-color:#36373c!important}
+.cb-head small,.cb-head p,.cb-status,.cb-item small,.cb-dialog p{color:#a5a6ad!important}
+.cb-page button,.cb-dialog button{background:#242529!important;color:#e3e4e8!important;border:1px solid #45464d!important}
+.cb-page button:hover,.cb-dialog button:hover{background:#36373d!important;border-color:#777980!important}
+.cb-item{background:#1c1d22!important;border-color:#36373c!important}
+.cb-track{background:#303137!important}
+.cb-track>div{background:#a4a7b0!important}
+.cb-dialog{background:#1b1c21!important;color:#e3e4e8!important;border-color:#4a4b51!important}
+.cb-dialog::backdrop{background:#050506c9}
+.cb-tab{flex:0 1 auto}
+.cb-tab .tab-select{white-space:nowrap}
