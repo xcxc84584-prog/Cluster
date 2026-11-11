@@ -120,7 +120,7 @@ async function guardRecovery(d){
  addChoice(tr('執行回滾','Roll back'),()=>{closeModal();void recoverRollback()});
  return true;
 }
-async function restore(id,force=false){
+async function restoreUnlocked(id,force=false){
  if(busy)return;busy=true;jobType='restore';
  let safety=null,mutationStarted=false,plan=null,rollbackId=null,storage=null,journal=null;
  try{
@@ -192,6 +192,17 @@ async function restore(id,force=false){
   }
   fail(e);
  }finally{busy=false;jobType=null;cancelRequested=false}
+}
+// Serialize restore/recovery across same-origin tabs where Web Locks is available.
+async function restore(id,force=false){
+ if(!root)return fail(new Error(tr('請先選擇專案資料夾','Choose a project folder first')));
+ if(!navigator.locks?.request)return fail(new Error(tr('瀏覽器不支援跨分頁還原鎖','Browser does not support cross-tab restore locking')));
+ const {d,manifest}=await store();
+ const lockName='cluster-restore:'+manifest.projectId;
+ return navigator.locks.request(lockName,{mode:'exclusive',ifAvailable:true},async lock=>{
+  if(!lock){fail(new Error(tr('另一個分頁正在操作此專案','Another tab is operating on this project')));return}
+  return restoreUnlocked(id,force);
+ });
 }
 async function forceRestore(id){if(busy)return;const before=(await store()).manifest.commits.length;await commit('full');const after=(await store()).manifest.commits.length;if(after!==before+1){fail(new Error(tr('安全完整備份失敗，拒絕強制還原','Safety full snapshot failed; force restore denied')));return}await restore(id,true)}
 async function refresh(reset=true){if(reset)progress(0,'');if(!root){$('cbList').textContent=tr('請選擇專案資料夾','Choose a project folder');return}try{const {manifest}=await store();$('cbList').replaceChildren();for(const c of [...manifest.commits].reverse()){const row=document.createElement('div');row.className='cb-item';const info=document.createElement('div');const name=document.createElement('strong');name.textContent=(labels[c.type]?.[$('uiLanguage')?.value==='en'?1:0]||c.type)+' · '+new Date(c.time).toLocaleString();const detail=document.createElement('small');detail.textContent=c.id+' · '+Object.keys(c.files).length+' files';info.append(name,detail);const b=document.createElement('button');b.textContent=tr('還原','Restore');b.onclick=()=>{dialog(tr('確認還原版本','Confirm restore'),tr('將覆寫目前專案檔案，備份紀錄不會刪除。','This overwrites project files; backup history remains.'));addChoice(tr('確認還原','Restore now'),()=>void restore(c.id))};const forceButton=document.createElement('button');forceButton.textContent=tr('強制還原','Force restore');forceButton.onclick=()=>{dialog(tr('強制還原（高風險）','Force restore (high risk)'),tr('將先完整備份目前專案。損毀的備份檔案會略過，可能產生不完整版本。','A full safety snapshot will be created first. Corrupted files will be skipped, potentially producing an incomplete version.'));addChoice(tr('確認強制還原','Confirm force restore'),()=>{closeModal();void forceRestore(c.id)})};row.append(info,b,forceButton);$('cbList').append(row)}if(!manifest.commits.length)$('cbList').textContent=tr('尚無提交紀錄，請先進行完整提交','No commits yet. Create a full snapshot first')}catch(e){fail(e)}}
