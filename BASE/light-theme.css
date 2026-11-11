@@ -312,3 +312,20 @@ html[data-cluster-theme="light"] .block-directory-row .block-directory-rename:ho
 html[data-cluster-theme="light"] .block-directory-row .block-directory-rename:focus-visible{background:#cbdffa!important;color:#103b70!important;border-color:#7da2d0!important;opacity:1!important}
 html[data-cluster-theme="light"] .block-directory-row .block-directory-delete{background:#fff2f3!important;color:#902c40!important;border:1px solid #e3b4bd!important;opacity:1!important}
 html[data-cluster-theme="light"] .block-directory-row .block-directory-delete:hover{background:#fbdde2!important;color:#7c1d32!important}
+
+/* Explorer Windows path registration modal: light-mode action states. */
+html[data-cluster-theme="light"] .cexp-path-dialog{color-scheme:light!important;background:#fff!important;color:#1b304b!important;border:1px solid #b8cbe1!important}
+html[data-cluster-theme="light"] .cexp-path-dialog :is(strong,p){color:#1d324e!important;opacity:1!important}
+html[data-cluster-theme="light"] .cexp-path-dialog input{background:#fff!important;color:#172e4b!important;border:1px solid #8da9c9!important;caret-color:#172e4b!important}
+html[data-cluster-theme="light"] .cexp-path-dialog input::placeholder{color:#425a77!important;opacity:1!important}
+html[data-cluster-theme="light"] .cexp-path-dialog input:focus-visible{outline:2px solid #2865b0!important;outline-offset:1px!important}
+html[data-cluster-theme="light"] .cexp-path-dialog .cexp-path-x{background:#e8eff9!important;color:#1b3e6b!important;border:1px solid #b5c8df!important;opacity:1!important}
+html[data-cluster-theme="light"] .cexp-path-dialog .cexp-path-x svg{stroke:currentColor!important;opacity:1!important}
+html[data-cluster-theme="light"] .cexp-path-dialog .cexp-path-x:hover{background:#d5e5fa!important;color:#103b72!important}
+html[data-cluster-theme="light"] .cexp-path-dialog .cexp-path-actions{background:transparent!important;color:#1c304b!important}
+html[data-cluster-theme="light"] .cexp-path-dialog .cexp-path-actions button{background:#e7eef8!important;color:#1b385a!important;border:1px solid #a5bdd9!important;opacity:1!important}
+html[data-cluster-theme="light"] .cexp-path-dialog .cexp-path-actions button:last-child{background:#245eaa!important;color:#fff!important;border-color:#1d508f!important}
+html[data-cluster-theme="light"] .cexp-path-dialog .cexp-path-actions button:hover{background:#d0e2fa!important;color:#143e73!important}
+html[data-cluster-theme="light"] .cexp-path-dialog .cexp-path-actions button:last-child:hover{background:#174b8e!important;color:#fff!important}
+html[data-cluster-theme="light"] .cexp-path-dialog :is(button,input):focus-visible{outline:2px solid #2865b0!important;outline-offset:2px!important}
+html[data-cluster-theme="light"] .cexp-path-dialog button:disabled{background:#e3eaf3!important;color:#455c79!important;opacity:1!important}
