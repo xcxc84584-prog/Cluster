@@ -38,8 +38,16 @@ async function readObject(d,v){if(!v.chunks)return bytesFor(d,'objects/'+v.hash)
 async function snapshot(){checkpoint();const entries=await walk(root),files={};let i=0;for(const entry of entries){checkpoint();const f=await entry.handle.getFile();files[entry.path]=await fingerprint(f);progress(Math.round(++i/Math.max(1,entries.length)*40),tr('掃描檔案','Scanning files')+' '+i+'/'+entries.length)}return {entries,files}}
 async function reconstruct(d,manifest,id){const commits=manifest.commits;const target=commits.findIndex(x=>x.id===id);if(target<0)throw Error('Missing commit');let base=-1;for(let i=target;i>=0;i--)if(commits[i].type==='full'){base=i;break}if(base<0)throw Error('Full snapshot missing');const state=Object.create(null);for(let i=base;i<=target;i++){const c=commits[i];if(c.type==='differential'){for(const k of Object.keys(state))delete state[k];Object.assign(state,commits[base].files);for(const p of c.deleted||[])delete state[p];Object.assign(state,c.files);continue}for(const p of c.deleted||[])delete state[p];Object.assign(state,c.files)}return state}
 async function verify(d,state){let i=0;for(const [p,v] of Object.entries(state)){const f=await readObject(d,v);const actual=await fingerprint(f);if(actual.hash!==v.hash||actual.size!==v.size)throw Error('HASH_MISMATCH: '+p);progress(60+Math.round(++i/Math.max(1,Object.keys(state).length)*30),tr('驗證還原鏈','Verifying restore chain')+' '+i)}return true}
-async function commit(type){if(busy)return;busy=true;cancelRequested=false;jobType='commit';try{const {d,manifest}=await store();if(await guardRecovery(d))return;if(!manifest.commits.length&&type!=='full')throw Error(tr('首次提交必須為完整提交','First commit must be full'));const {entries,files}=await snapshot();const previous=manifest.commits.at(-1);const full=type==='full';const reference=full?{}:await reconstruct(d,manifest,type==='differential'?[...manifest.commits].reverse().find(c=>c.type==='full').id:previous.id);const changed=Object.fromEntries(Object.entries(files).filter(([p,v])=>!reference[p]||reference[p].hash!==v.hash));const deleted=Object.keys(reference).filter(p=>!files[p]);const objects=await dir(d,'objects',true);let i=0;for(const entry of entries.filter(e=>changed[e.path])){checkpoint();const f=await entry.handle.getFile(),v=files[entry.path],h=v.hash;if((await fingerprint(f)).hash!==h)throw Error('SOURCE_CHANGED_DURING_BACKUP: '+entry.path);if(v.chunks){for(let off=0,index=0;off<f.size;off+=CHUNK,index++){checkpoint();const hash=v.chunks[index];try{await file(objects,hash)}catch(e){if(e.name!=='NotFoundError')throw e;await putBytes(d,'objects/'+hash,f.slice(off,off+CHUNK))}}}else{try{await file(objects,h)}catch(e){if(e.name!=='NotFoundError')throw e;await putBytes(d,'objects/'+h,f)}}progress(40+Math.round(++i/Math.max(1,Object.keys(changed).length)*20),tr('寫入備份','Writing backup')+' '+i)}
+async function commitUnlocked(type){if(busy)return;busy=true;cancelRequested=false;jobType='commit';try{const {d,manifest}=await store();if(await guardRecovery(d))return;if(!manifest.commits.length&&type!=='full')throw Error(tr('首次提交必須為完整提交','First commit must be full'));const {entries,files}=await snapshot();const previous=manifest.commits.at(-1);const full=type==='full';const reference=full?{}:await reconstruct(d,manifest,type==='differential'?[...manifest.commits].reverse().find(c=>c.type==='full').id:previous.id);const changed=Object.fromEntries(Object.entries(files).filter(([p,v])=>!reference[p]||reference[p].hash!==v.hash));const deleted=Object.keys(reference).filter(p=>!files[p]);const objects=await dir(d,'objects',true);let i=0;for(const entry of entries.filter(e=>changed[e.path])){checkpoint();const f=await entry.handle.getFile(),v=files[entry.path],h=v.hash;if((await fingerprint(f)).hash!==h)throw Error('SOURCE_CHANGED_DURING_BACKUP: '+entry.path);if(v.chunks){for(let off=0,index=0;off<f.size;off+=CHUNK,index++){checkpoint();const hash=v.chunks[index];try{await file(objects,hash)}catch(e){if(e.name!=='NotFoundError')throw e;await putBytes(d,'objects/'+hash,f.slice(off,off+CHUNK))}}}else{try{await file(objects,h)}catch(e){if(e.name!=='NotFoundError')throw e;await putBytes(d,'objects/'+h,f)}}progress(40+Math.round(++i/Math.max(1,Object.keys(changed).length)*20),tr('寫入備份','Writing backup')+' '+i)}
 const id=new Date().toISOString().replace(/[:.]/g,'-')+'-'+crypto.randomUUID().slice(0,8);const c={id,type,time:new Date().toISOString(),parent:previous?.id||null,files:changed,deleted};const candidate={...manifest,commits:[...manifest.commits,c]};const state=await reconstruct(d,candidate,id);if(Object.keys(state).length!==Object.keys(files).length||Object.entries(files).some(([p,v])=>state[p]?.hash!==v.hash))throw Error('RESTORE_STATE_MISMATCH');await verify(d,state);checkpoint();await writeText(d,'manifest.json',JSON.stringify(candidate,null,2));progress(100,tr('提交成功 · 還原測試通過','Commit successful · Restore verification passed'));closeModal();await refresh(false)}catch(e){fail(e)}finally{busy=false;jobType=null;cancelRequested=false}}
+async function commit(type){
+ if(!navigator.locks?.request)return fail(new Error('WEB_LOCKS_UNAVAILABLE'));
+ const {manifest}=await store();
+ return navigator.locks.request('cluster-restore:'+manifest.projectId,{mode:'exclusive',ifAvailable:true},async lock=>{
+  if(!lock)return fail(new Error('PROJECT_BACKUP_LOCKED'));
+  return commitUnlocked(type);
+ });
+}
 // DPR2.7: plan file-level changes first; only touched paths require rollback.
 async function restorePlan(state,current,force,skipped){
  const existing=new Map(current.map(e=>[e.path,e.handle]));
@@ -83,7 +91,7 @@ async function pendingRestore(d){
 }
 async function writePending(d,value){await writeText(d,pendingFile,JSON.stringify(value))}
 async function clearPending(d){try{await d.removeEntry(pendingFile)}catch(e){if(e.name!=='NotFoundError')throw e}}
-async function recoverRollback(){
+async function recoverRollbackUnlocked(){
  if(busy)return;
  busy=true;jobType='recovery';
  try{
@@ -111,6 +119,14 @@ async function recoverRollback(){
   progress(100,tr('中斷還原已回滾','Interrupted restore rolled back'));
  }catch(e){fail(e);dialog(tr('恢復失敗，請保留備份資料','Recovery failed; preserve backup data'),String(e.message||e))}
  finally{busy=false;jobType=null}
+}
+async function recoverRollback(){
+ if(!navigator.locks?.request)return fail(new Error('WEB_LOCKS_UNAVAILABLE'));
+ const {manifest}=await store();
+ return navigator.locks.request('cluster-restore:'+manifest.projectId,{mode:'exclusive',ifAvailable:true},async lock=>{
+  if(!lock)return fail(new Error('PROJECT_RESTORE_LOCKED'));
+  return recoverRollbackUnlocked();
+ });
 }
 async function guardRecovery(d){
  const pending=await pendingRestore(d);
