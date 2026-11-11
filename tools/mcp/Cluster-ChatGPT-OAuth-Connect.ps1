@@ -95,7 +95,17 @@ try{
  $issuer=$null
  for($i=0;$i -lt 90;$i++){
   Start-Sleep -Milliseconds 500
-  if($tunnel.HasExited){throw 'cloudflared exited before creating a URL.'}
+  if($tunnel.HasExited){
+   $details=@()
+   foreach($path in @($err,$log)){
+    if(Test-Path -LiteralPath $path){
+     $details+=@(Get-Content -LiteralPath $path -Tail 30 -ErrorAction SilentlyContinue)
+    }
+   }
+   $diagnostic=($details | Where-Object {$_ -and $_.Trim()} | Select-Object -Last 20) -join [Environment]::NewLine
+   if($diagnostic){Write-Host 'cloudflared diagnostic output:' -ForegroundColor Yellow;Write-Host $diagnostic}
+   throw ('cloudflared exited before creating a URL (exit code '+$tunnel.ExitCode+'). Check the diagnostic output and log paths above.')
+  }
   foreach($file in @($err,$log)){
    if(Test-Path -LiteralPath $file){
     $raw=Get-Content -LiteralPath $file -Raw -ErrorAction SilentlyContinue
