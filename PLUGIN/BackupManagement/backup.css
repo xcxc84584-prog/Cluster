@@ -83,3 +83,11 @@ header #projectToolMenu button:hover{background:#303137!important}
 }
 #clusterBackupPage .cb-item>div{flex:1;min-width:0}
 #clusterBackupPage .cb-item>button{flex:0 0 auto;margin-left:16px}
+
+/* Full-workspace Backup Management: never constrain the editor page to a centered card. */
+#clusterBackupPage{position:absolute!important;inset:0!important;box-sizing:border-box!important;width:100%!important;height:100%!important;min-width:0!important;overflow:auto!important;padding:0!important}
+#clusterBackupPage .cb-shell{width:100%!important;max-width:none!important;min-width:0!important;min-height:100%!important;margin:0!important;box-sizing:border-box!important;padding:clamp(16px,2.5vw,36px)!important}
+#clusterBackupPage .cb-head{width:100%;box-sizing:border-box}
+#clusterBackupPage .cb-list{width:100%!important;max-width:none!important}
+#clusterBackupPage .cb-item{max-width:none!important}
+@media(max-width:750px){#clusterBackupPage .cb-shell{width:100%!important;padding:14px!important}#clusterBackupPage .cb-item{flex-wrap:wrap;gap:10px}}
