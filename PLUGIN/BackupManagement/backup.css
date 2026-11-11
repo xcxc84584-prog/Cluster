@@ -20,3 +20,30 @@ header #projectToolMenu button:hover{background:#303137!important}
 .cb-dialog::backdrop{background:#050506c9}
 .cb-tab{flex:0 1 auto}
 .cb-tab .tab-select{white-space:nowrap}
+
+/* DPR: top bar is one continuous toolbar, not two detached groups. */
+.app > header{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;background:#191a1e!important}
+.app > header .brand{flex:0 0 auto}
+.app > header #cexpToggle{flex:0 0 auto}
+.app > header .cb-project-wrap{flex:0 0 auto;margin-left:0!important}
+.app > header #cbSubmitButton{margin-left:auto!important;flex:0 0 auto}
+.app > header .cb-project-wrap~.menu-wrap{margin-left:0!important;flex:0 0 auto}
+.app > header #blockDirectoryButton{flex:0 0 auto}
+.app > header #projectToolButton,.app > header #cbSubmitButton,.app > header #fileButton,.app > header #blockDirectoryButton{height:34px!important;min-height:34px!important;box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:0 13px!important;border-radius:7px!important;background:#26272c!important;border:1px solid #42434a!important;color:#e8e9ec!important;font:600 12px/1 system-ui,sans-serif!important;letter-spacing:0!important;box-shadow:none!important}
+.app > header #projectToolButton:hover,.app > header #cbSubmitButton:hover,.app > header #fileButton:hover,.app > header #blockDirectoryButton:hover{background:#35363c!important;border-color:#62636a!important}
+.app > header #projectToolButton[aria-expanded=true]{background:#35363c!important}
+.app > header #projectToolMenu{min-width:210px;width:210px}
+#clusterBackupPage{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;overflow:auto!important;padding:0!important;background:#090a0d!important;display:block!important}
+#clusterBackupPage[hidden]{display:none!important}
+#clusterBackupPage .cb-shell{width:min(1050px,calc(100% - 64px));min-height:100%;margin:0 auto;padding:30px 0 50px}
+#clusterBackupPage .cb-head{display:flex;align-items:center;gap:20px;padding:0 0 22px}
+#clusterBackupPage .cb-head h2{font-size:23px;margin:7px 0}
+#clusterBackupPage .cb-head p{margin:5px 0 0}
+#clusterBackupPage .cb-status{padding:14px 0;margin:0;min-height:48px}
+#clusterBackupPage .cb-toolbar{margin:16px 0 18px}
+#clusterBackupPage .cb-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));align-content:start;gap:12px}
+#clusterBackupPage .cb-item{min-height:84px;background:#191a1f!important;border-color:#35363c!important}
+#clusterBackupPage .cb-item strong{font-size:12px}
+#clusterBackupPage .cb-item small{font-size:11px}
+#clusterBackupPage .cb-head button,#clusterBackupPage .cb-toolbar button,#clusterBackupPage .cb-item button{border-radius:7px!important;background:#26272c!important}
+@media(max-width:750px){.app > header{gap:5px!important}.app > header #projectToolButton,.app > header #cbSubmitButton,.app > header #fileButton,.app > header #blockDirectoryButton{padding:0 7px!important;font-size:10px!important}#clusterBackupPage .cb-shell{width:calc(100% - 28px);padding-top:20px}#clusterBackupPage .cb-head{flex-wrap:wrap}}
