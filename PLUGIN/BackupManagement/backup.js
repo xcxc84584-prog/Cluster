@@ -40,14 +40,16 @@ async function reconstruct(d,manifest,id){const commits=manifest.commits;const t
 async function verify(d,state){let i=0;for(const [p,v] of Object.entries(state)){const f=await readObject(d,v);const actual=await fingerprint(f);if(actual.hash!==v.hash||actual.size!==v.size)throw Error('HASH_MISMATCH: '+p);progress(60+Math.round(++i/Math.max(1,Object.keys(state).length)*30),tr('驗證還原鏈','Verifying restore chain')+' '+i)}return true}
 async function commit(type){if(busy)return;busy=true;cancelRequested=false;jobType='commit';try{const {d,manifest}=await store();if(!manifest.commits.length&&type!=='full')throw Error(tr('首次提交必須為完整提交','First commit must be full'));const {entries,files}=await snapshot();const previous=manifest.commits.at(-1);const full=type==='full';const reference=full?{}:await reconstruct(d,manifest,type==='differential'?[...manifest.commits].reverse().find(c=>c.type==='full').id:previous.id);const changed=Object.fromEntries(Object.entries(files).filter(([p,v])=>!reference[p]||reference[p].hash!==v.hash));const deleted=Object.keys(reference).filter(p=>!files[p]);const objects=await dir(d,'objects',true);let i=0;for(const entry of entries.filter(e=>changed[e.path])){checkpoint();const f=await entry.handle.getFile(),v=files[entry.path],h=v.hash;if((await fingerprint(f)).hash!==h)throw Error('SOURCE_CHANGED_DURING_BACKUP: '+entry.path);if(v.chunks){for(let off=0,index=0;off<f.size;off+=CHUNK,index++){checkpoint();const hash=v.chunks[index];try{await file(objects,hash)}catch(e){if(e.name!=='NotFoundError')throw e;await putBytes(d,'objects/'+hash,f.slice(off,off+CHUNK))}}}else{try{await file(objects,h)}catch(e){if(e.name!=='NotFoundError')throw e;await putBytes(d,'objects/'+h,f)}}progress(40+Math.round(++i/Math.max(1,Object.keys(changed).length)*20),tr('寫入備份','Writing backup')+' '+i)}
 const id=new Date().toISOString().replace(/[:.]/g,'-')+'-'+crypto.randomUUID().slice(0,8);const c={id,type,time:new Date().toISOString(),parent:previous?.id||null,files:changed,deleted};const candidate={...manifest,commits:[...manifest.commits,c]};const state=await reconstruct(d,candidate,id);if(Object.keys(state).length!==Object.keys(files).length||Object.entries(files).some(([p,v])=>state[p]?.hash!==v.hash))throw Error('RESTORE_STATE_MISMATCH');await verify(d,state);checkpoint();await writeText(d,'manifest.json',JSON.stringify(candidate,null,2));progress(100,tr('提交成功 · 還原測試通過','Commit successful · Restore verification passed'));closeModal();await refresh(false)}catch(e){fail(e)}finally{busy=false;jobType=null;cancelRequested=false}}
-async function restore(id){
+async function restore(id,force=false){
  if(busy)return;busy=true;jobType='restore';
  let safety=null,mutationStarted=false,rollbackPaths=[];
  try{
   const {d,manifest}=await store(),state=await reconstruct(d,manifest,id);
-  await verify(d,state);
+  const skipped=[];
+  if(!force)await verify(d,state);
+  else{for(const [path,v] of Object.entries(state)){try{const data=await readObject(d,v);if((await fingerprint(data)).hash!==v.hash)throw Error('HASH_MISMATCH')}catch(e){skipped.push(path)}}}
   const current=await walk(root);
-  const targetPaths=Object.keys(state),currentPaths=current.map(e=>e.path);
+  const targetPaths=Object.keys(state).filter(p=>!skipped.includes(p)),currentPaths=current.map(e=>e.path);
   const rollback=await dir(d,'rollback',true);
   safety=await dir(rollback,crypto.randomUUID(),true);
   for(const e of current)await putBytes(safety,e.path,await e.handle.getFile());
@@ -59,16 +61,17 @@ async function restore(id){
   mutationStarted=true;
   let i=0;
   for(const [p,v] of Object.entries(state)){
+   if(skipped.includes(p))continue;
    const original=await readObject(d,v);
    await putBytes(root,p,original);
    progress(90+Math.round(++i/Math.max(1,targetPaths.length)*8),tr('還原檔案','Restoring files')+' '+i);
   }
-  for(const p of currentPaths.filter(p=>!state[p]))await removePath(root,p);
+  for(const p of currentPaths.filter(p=>!state[p]&&!force))await removePath(root,p);
   const result=await walk(root);
-  if(result.length!==targetPaths.length)throw Error('RESTORE_COUNT_MISMATCH');
-  for(const e of result)if((await fingerprint(await e.handle.getFile())).hash!==state[e.path]?.hash)throw Error('RESTORE_HASH_MISMATCH: '+e.path);
+  if(!force&&result.length!==targetPaths.length)throw Error('RESTORE_COUNT_MISMATCH');
+  for(const e of result){if(force&&!targetPaths.includes(e.path))continue;if((await fingerprint(await e.handle.getFile())).hash!==state[e.path]?.hash)throw Error('RESTORE_HASH_MISMATCH: '+e.path)}
   await writeText(safety,'rollback-manifest.json',JSON.stringify({paths:currentPaths,target:id,status:'completed',created:new Date().toISOString()}));
-  progress(100,tr('還原成功 · 備份紀錄保留','Restore successful · Backup history preserved'));closeModal();await refresh(false);
+  progress(100,skipped.length?tr('強制還原完成，略過損毀檔案：','Force restore completed; skipped corrupted files: ')+skipped.join(', '):tr('還原成功 · 備份紀錄保留','Restore successful · Backup history preserved'));closeModal();await refresh(false);
  }catch(e){
   if(mutationStarted&&safety){
    try{
@@ -84,7 +87,8 @@ async function restore(id){
   fail(e);
  }finally{busy=false;jobType=null}
 }
-async function refresh(reset=true){if(reset)progress(0,'');if(!root){$('cbList').textContent=tr('請選擇專案資料夾','Choose a project folder');return}try{const {manifest}=await store();$('cbList').replaceChildren();for(const c of [...manifest.commits].reverse()){const row=document.createElement('div');row.className='cb-item';const info=document.createElement('div');const name=document.createElement('strong');name.textContent=(labels[c.type]?.[$('uiLanguage')?.value==='en'?1:0]||c.type)+' · '+new Date(c.time).toLocaleString();const detail=document.createElement('small');detail.textContent=c.id+' · '+Object.keys(c.files).length+' files';info.append(name,detail);const b=document.createElement('button');b.textContent=tr('還原','Restore');b.onclick=()=>{dialog(tr('確認還原版本','Confirm restore'),tr('將覆寫目前專案檔案，備份紀錄不會刪除。','This overwrites project files; backup history remains.'));addChoice(tr('確認還原','Restore now'),()=>void restore(c.id))};row.append(info,b);$('cbList').append(row)}if(!manifest.commits.length)$('cbList').textContent=tr('尚無提交紀錄，請先進行完整提交','No commits yet. Create a full snapshot first')}catch(e){fail(e)}}
+async function forceRestore(id){if(busy)return;const before=(await store()).manifest.commits.length;await commit('full');const after=(await store()).manifest.commits.length;if(after!==before+1){fail(new Error(tr('安全完整備份失敗，拒絕強制還原','Safety full snapshot failed; force restore denied')));return}await restore(id,true)}
+async function refresh(reset=true){if(reset)progress(0,'');if(!root){$('cbList').textContent=tr('請選擇專案資料夾','Choose a project folder');return}try{const {manifest}=await store();$('cbList').replaceChildren();for(const c of [...manifest.commits].reverse()){const row=document.createElement('div');row.className='cb-item';const info=document.createElement('div');const name=document.createElement('strong');name.textContent=(labels[c.type]?.[$('uiLanguage')?.value==='en'?1:0]||c.type)+' · '+new Date(c.time).toLocaleString();const detail=document.createElement('small');detail.textContent=c.id+' · '+Object.keys(c.files).length+' files';info.append(name,detail);const b=document.createElement('button');b.textContent=tr('還原','Restore');b.onclick=()=>{dialog(tr('確認還原版本','Confirm restore'),tr('將覆寫目前專案檔案，備份紀錄不會刪除。','This overwrites project files; backup history remains.'));addChoice(tr('確認還原','Restore now'),()=>void restore(c.id))};const forceButton=document.createElement('button');forceButton.textContent=tr('強制還原','Force restore');forceButton.onclick=()=>{dialog(tr('強制還原（高風險）','Force restore (high risk)'),tr('將先完整備份目前專案。損毀的備份檔案會略過，可能產生不完整版本。','A full safety snapshot will be created first. Corrupted files will be skipped, potentially producing an incomplete version.'));addChoice(tr('確認強制還原','Confirm force restore'),()=>{closeModal();void forceRestore(c.id)})};row.append(info,b,forceButton);$('cbList').append(row)}if(!manifest.commits.length)$('cbList').textContent=tr('尚無提交紀錄，請先進行完整提交','No commits yet. Create a full snapshot first')}catch(e){fail(e)}}
 function submit(){if(busy){dialog(tr('備份進行中','Backup in progress'),tr('是否中斷上次備份？中斷將等待目前檔案操作結束。','Interrupt the previous backup? Cancellation occurs after the current file operation.'));addChoice(tr('中斷上次備份','Interrupt previous backup'),()=>{cancelRequested=true;closeModal()});return}dialog(tr('提交專案備份','Commit project backup'),tr('選擇提交類型，首次提交必須為完整提交。','Select commit type. First commit must be full.'));for(const type of ['full','differential','incremental'])addChoice(labels[type][$('uiLanguage')?.value==='en'?1:0],()=>void commit(type))}
 window.addEventListener('cluster:file-open',()=>deactivate());window.addEventListener('cluster:tab-change',()=>deactivate());
 function deactivate(){active=false;ui.hidden=true;document.body.classList.remove('cluster-backup-active');tab?.classList.remove('is-active')}
