@@ -233,3 +233,43 @@ html[data-cluster-theme="light"] #cexpToggle:hover{background:#d1e3fb!important}
 html[data-cluster-theme="light"] #explorerButton[aria-pressed="true"],
 html[data-cluster-theme="light"] #explorerToggle[aria-expanded="true"],
 html[data-cluster-theme="light"] #cexpToggle[aria-expanded="true"]{background:#c5dcfa!important;color:#123e78!important}
+
+/* Light-mode contrast audit v6: Prism fallback first, then specific token colors. */
+html[data-cluster-theme="light"] #clusterSyntaxOverlay,
+html[data-cluster-theme="light"] #clusterSyntaxCode,
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token,
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token .token{color:#192b44!important;opacity:1!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay :is(.token.comment,.token.prolog,.token.doctype){color:#40556e!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay :is(.token.keyword,.token.atrule,.token.important){color:#7030a3!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay :is(.token.string,.token.char,.token.regex){color:#12643b!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay :is(.token.number,.token.boolean,.token.constant){color:#994012!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay :is(.token.function,.token.class-name,.token.builtin){color:#1551a4!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay :is(.token.operator,.token.punctuation){color:#283e5a!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay :is(.token.property,.token.tag,.token.deleted){color:#9d2946!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay :is(.token.selector,.token.attr-name,.token.inserted){color:#805000!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay :is(.token.parameter,.token.variable,.token.plain-text,.token.entity,.token.namespace){color:#192b44!important}
+/* File > Tools section title is a <summary>, not a generic tool heading. */
+html[data-cluster-theme="light"] #fileMenu .tool-group{background:#fff!important;color:#1b304a!important}
+html[data-cluster-theme="light"] #fileMenu .tool-group>summary{background:#e8eff8!important;color:#1b304a!important;opacity:1!important;border:1px solid #bdcde0!important;border-radius:7px!important;font-weight:650!important}
+html[data-cluster-theme="light"] #fileMenu .tool-group>summary::after{color:#284f80!important;opacity:1!important}
+html[data-cluster-theme="light"] #fileMenu .tool-group>summary:hover,
+html[data-cluster-theme="light"] #fileMenu .tool-group>summary:focus-visible{background:#d9e9fc!important;color:#123d73!important}
+html[data-cluster-theme="light"] #fileMenu .tool-group[open]>summary{background:#d9e9fc!important;color:#123d73!important}
+/* Block Directory popover: overwrite legacy !important black theme at each surface. */
+html[data-cluster-theme="light"] .block-directory{background:#f7f9fd!important;color:#192c45!important;border:1px solid #b9c9dc!important;box-shadow:0 14px 36px #243c5b25!important}
+html[data-cluster-theme="light"] .block-directory-head{background:#e9f0f9!important;color:#192c45!important;border-color:#c2d0e1!important}
+html[data-cluster-theme="light"] .block-directory-kicker,
+html[data-cluster-theme="light"] .block-directory-count{color:#3f536e!important}
+html[data-cluster-theme="light"] .block-directory-heading strong{color:#152b47!important}
+html[data-cluster-theme="light"] .block-directory-list{background:#f7f9fd!important;color:#192c45!important}
+html[data-cluster-theme="light"] .block-directory-row{background:#fff!important;border-color:#c4d2e3!important;color:#192c45!important}
+html[data-cluster-theme="light"] .block-directory-row:hover{background:#e7f0ff!important;border-color:#86a8d3!important}
+html[data-cluster-theme="light"] .block-directory-item{background:transparent!important;color:#192c45!important}
+html[data-cluster-theme="light"] .block-directory-item strong{color:#182e49!important}
+html[data-cluster-theme="light"] .block-directory-item small{color:#405671!important}
+html[data-cluster-theme="light"] .block-directory-rename,
+html[data-cluster-theme="light"] .block-directory-delete{background:#e9eff8!important;color:#193754!important;border-color:#b9c9df!important}
+html[data-cluster-theme="light"] .block-directory-rename:hover,
+html[data-cluster-theme="light"] .block-directory-delete:hover{background:#d5e6fc!important;color:#123b70!important}
+html[data-cluster-theme="light"] .block-directory-input{background:#fff!important;color:#182d48!important;border-color:#9bb3d0!important}
+html[data-cluster-theme="light"] .block-directory :is(button,summary):focus-visible{outline:2px solid #2362ad!important;outline-offset:2px}
