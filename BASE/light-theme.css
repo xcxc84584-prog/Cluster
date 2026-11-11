@@ -288,3 +288,27 @@ html[data-cluster-theme="light"] .block-directory .block-directory-input:focus{o
 html[data-cluster-theme="light"] .block-directory .block-directory-rename{background:#dceafc!important;color:#173e73!important;border:1px solid #93b1d5!important;opacity:1!important}
 html[data-cluster-theme="light"] .block-directory .block-directory-rename:hover,
 html[data-cluster-theme="light"] .block-directory .block-directory-rename:focus-visible{background:#c6dfff!important;color:#10376d!important}
+
+/* DPR light dialog and inline block rename: explicit state-aware controls. */
+html[data-cluster-theme="light"] #plibBlockDialog{color-scheme:light!important;background:#fff!important;color:#172b45!important;border:1px solid #b6c9e1!important;box-shadow:0 24px 70px #243c5b38!important}
+html[data-cluster-theme="light"] #plibBlockDialog::backdrop{background:rgba(31,49,74,.34)!important}
+html[data-cluster-theme="light"] #plibBlockDialog h3{color:#172b45!important}
+html[data-cluster-theme="light"] #plibBlockDialog .plib-dialog-subtitle,
+html[data-cluster-theme="light"] #plibBlockDialog .plib-dialog-hint{color:#344b69!important;opacity:1!important}
+html[data-cluster-theme="light"] #plibBlockDialog label{color:#1d3554!important}
+html[data-cluster-theme="light"] #plibBlockDialog input{background:#fff!important;color:#162c48!important;border:1px solid #8ba8cb!important;caret-color:#162c48!important;opacity:1!important}
+html[data-cluster-theme="light"] #plibBlockDialog input::placeholder{color:#4b617b!important;opacity:1!important}
+html[data-cluster-theme="light"] #plibBlockDialog input:focus{outline:2px solid #2867b5!important;outline-offset:1px!important;box-shadow:0 0 0 3px #d4e7ff!important}
+html[data-cluster-theme="light"] #plibBlockDialog .plib-dialog-actions button{background:#e8eff8!important;color:#1d3859!important;border:1px solid #9eb6d3!important;opacity:1!important}
+html[data-cluster-theme="light"] #plibBlockDialog .plib-dialog-actions button:hover{background:#d4e5fb!important;color:#133f78!important;filter:none!important}
+html[data-cluster-theme="light"] #plibBlockDialog .plib-dialog-actions button[type=submit]{background:#245eab!important;color:#fff!important;border-color:#1d518f!important}
+html[data-cluster-theme="light"] #plibBlockDialog .plib-dialog-actions button[type=submit]:hover{background:#174c91!important;color:#fff!important}
+html[data-cluster-theme="light"] #plibBlockDialog .plib-dialog-actions button:focus-visible{outline:2px solid #2867b5!important;outline-offset:2px!important}
+html[data-cluster-theme="light"] #plibBlockDialog .plib-dialog-actions button:disabled{background:#dfe6ef!important;color:#405672!important;opacity:1!important}
+html[data-cluster-theme="light"] #plibError{color:#9e2035!important}
+html[data-cluster-theme="light"] .block-directory-row .block-directory-rename{background:#e1ebf8!important;color:#193c6a!important;border:1px solid #a4bcd8!important;opacity:1!important}
+html[data-cluster-theme="light"] .block-directory-row:hover .block-directory-rename,
+html[data-cluster-theme="light"] .block-directory-row .block-directory-rename:hover,
+html[data-cluster-theme="light"] .block-directory-row .block-directory-rename:focus-visible{background:#cbdffa!important;color:#103b70!important;border-color:#7da2d0!important;opacity:1!important}
+html[data-cluster-theme="light"] .block-directory-row .block-directory-delete{background:#fff2f3!important;color:#902c40!important;border:1px solid #e3b4bd!important;opacity:1!important}
+html[data-cluster-theme="light"] .block-directory-row .block-directory-delete:hover{background:#fbdde2!important;color:#7c1d32!important}
