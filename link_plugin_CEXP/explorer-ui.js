@@ -1,6 +1,22 @@
 /* [MOD-002] CEXP opt1 compact dark UI and file operations. */
 'use strict';
 (()=>{const api=window.ClusterCEXP,$=id=>document.getElementById(id),panel=$('cexpSidebar'),tree=$('cexpTree'),status=$('cexpStatus');let selected=null;let activeNode=null;let activeDetail=null;let revealSerial=0;let dragState=null;let moveMode=false;
+ // The selected Explorer entry determines the backup project, not a second picker.
+ function projectFor(node){
+  if(!node)return null;
+  let n=node;
+  while(n.parent)n=n.parent;
+  return api.roots.includes(n)&&n.kind==='directory'?n:null;
+ }
+ function selectedProject(){
+  const fromSelection=projectFor(selected)||projectFor(activeNode);
+  if(fromSelection)return {handle:fromSelection.handle,id:fromSelection.persistId||fromSelection.id,name:fromSelection.name};
+  const directories=api.roots.filter(n=>n.kind==='directory');
+  if(directories.length===1)return {handle:directories[0].handle,id:directories[0].persistId||directories[0].id,name:directories[0].name};
+  return null;
+ }
+ function notifyProject(){window.dispatchEvent(new CustomEvent('cluster:explorer-project-change',{detail:selectedProject()}))}
+ window.ClusterExplorerProject={current:selectedProject};
  const setStatus=(msg,error=false)=>{status.textContent=msg;status.className=error?'cexp-error':'';};
  // Workspace shell: Explorer and the editor/tab column are true flex siblings.
  // Explorer begins directly under the app header; tabs move WITH the editor.
@@ -117,11 +133,11 @@
   if(detail.handle){try{found=await api.revealHandle(detail.handle);}catch(e){setStatus('無法定位目前文件：'+e.message,true);}}
   if(serial!==revealSerial)return;
   if(!found&&detail.docId)found=api.roots.find(n=>n.docId===detail.docId)||null;
-  activeNode=found;
+  activeNode=found;notifyProject();
   if(found){selected=found;render();if(scroll&&!panel.hidden){const row=[...tree.querySelectorAll('.cexp-node')].find(x=>x.__cexpNode===found);row?.scrollIntoView({block:'nearest',behavior:'smooth'});}}
   else render();
  }
- function draw(n,depth){const row=document.createElement('div');row.className='cexp-node'+(!n.parent?' cexp-root':'')+(selected===n?' is-selected':'')+(activeNode===n?' is-active-file':'')+' cexp-type-'+category(n);row.style.setProperty('--depth',depth);row.__cexpNode=n;row.setAttribute('role','treeitem');row.setAttribute('aria-label',n.name);if(n.kind==='directory')row.setAttribute('aria-expanded',String(n.expanded));const label=document.createElement('span');label.className='cexp-label';const glyph=document.createElement('span');glyph.className='cexp-glyph';glyph.textContent=n.kind==='directory'?(n.expanded?'▾':'▸'):'·';const icon=document.createElement('span');icon.className='cexp-fileicon';icon.textContent=categoryGlyph[category(n)];icon.title={folder:'資料夾',draft:'未儲存文件',program:'程式碼',document:'文件',config:'設定檔',media:'媒體檔',web:'網頁資源',other:'其他檔案'}[category(n)];const text=document.createElement('span');text.textContent=n.name;label.append(glyph,icon,text);if(activeNode===n)row.setAttribute('aria-current','true');label.tabIndex=0;const act=async()=>{selected=n;render();try{if(n.kind==='directory')await api.expand(n);else if(n.kind==='draft')await window.ClusterExplorerHost.activateDraft(n.docId);else await window.ClusterExplorerHost.openHandle(n.handle);}catch(e){setStatus(e.message,true);}};label.addEventListener('click',e=>{if(label.dataset.suppressClick==='1'){delete label.dataset.suppressClick;e.preventDefault();return;}void act();});label.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();void act();}});bindLongPress(label,n);row.append(label);
+ function draw(n,depth){const row=document.createElement('div');row.className='cexp-node'+(!n.parent?' cexp-root':'')+(selected===n?' is-selected':'')+(activeNode===n?' is-active-file':'')+' cexp-type-'+category(n);row.style.setProperty('--depth',depth);row.__cexpNode=n;row.setAttribute('role','treeitem');row.setAttribute('aria-label',n.name);if(n.kind==='directory')row.setAttribute('aria-expanded',String(n.expanded));const label=document.createElement('span');label.className='cexp-label';const glyph=document.createElement('span');glyph.className='cexp-glyph';glyph.textContent=n.kind==='directory'?(n.expanded?'▾':'▸'):'·';const icon=document.createElement('span');icon.className='cexp-fileicon';icon.textContent=categoryGlyph[category(n)];icon.title={folder:'資料夾',draft:'未儲存文件',program:'程式碼',document:'文件',config:'設定檔',media:'媒體檔',web:'網頁資源',other:'其他檔案'}[category(n)];const text=document.createElement('span');text.textContent=n.name;label.append(glyph,icon,text);if(activeNode===n)row.setAttribute('aria-current','true');label.tabIndex=0;const act=async()=>{selected=n;render();notifyProject();try{if(n.kind==='directory')await api.expand(n);else if(n.kind==='draft')await window.ClusterExplorerHost.activateDraft(n.docId);else await window.ClusterExplorerHost.openHandle(n.handle);}catch(e){setStatus(e.message,true);}};label.addEventListener('click',e=>{if(label.dataset.suppressClick==='1'){delete label.dataset.suppressClick;e.preventDefault();return;}void act();});label.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();void act();}});bindLongPress(label,n);row.append(label);
  const actions=document.createElement('span');actions.className='cexp-actions';actions.append(button('⊟','關閉此檔案／資料夾的編輯分頁',()=>closeEditorTabs(n),'cexp-close-tabs'));if(n.kind==='directory')actions.append(button('+','新增檔案',async()=>{inlineEdit(row,'',async name=>{await api.create(n,name,'file');setStatus('已建立 '+name);},'新檔案名稱');}),button('▣','新增資料夾',async()=>{inlineEdit(row,'',async name=>{await api.create(n,name,'directory');setStatus('已建立 '+name);},'新資料夾名稱');}));if(n.parent)actions.append(button('✎','重新命名',()=>inlineEdit(row,n.name,async name=>{if(n.kind==='file'&&await window.ClusterTabs?.isOpenHandle?.(n.handle))throw Error('請先關閉此檔案的編輯分頁再重新命名');await api.rename(n,name);setStatus('已重新命名 '+name);},'重新命名')),button('⇄',moveMode?'解除移動模式':'進入移動模式',()=>setMoveMode(!moveMode),'cexp-mode-button'+(moveMode?' is-on':'')),button('×','永久刪除',()=>del(n,row),'cexp-danger'));else actions.append(button('−',n.kind==='draft'?'從 Explorer 移除暫存入口':'從工作區移除 Root（不刪除磁碟資料）',async()=>{if(n.kind==='directory'){if(!await window.ClusterTabs?.closeByRoot?.(n.handle))throw Error('編輯分頁未關閉，已取消移除');}else if(!await closeNodeTabs(n))throw Error('編輯分頁未關閉，已取消移除');return n.kind==='draft'?api.removeDraft(n.docId):api.removeRoot(n);}));row.append(actions);tree.append(row);if(n.expanded)for(const child of n.children||[])draw(child,depth+1);}
  function render(){tree.replaceChildren();if(!api.roots.length){const empty=document.createElement('div');empty.className='cexp-muted';empty.textContent='尚未載入工作區 · 按 ＋ 加入本地資料夾';tree.append(empty);}else for(const n of api.roots)draw(n,0);$('cexpCount').textContent=api.roots.length+' ROOTS';}
  // [ADD-OPT3-002] File menu / native editor operations notify Explorer.
@@ -135,5 +151,5 @@
  window.addEventListener('cluster:session-restored',e=>{syncQueue=syncQueue.catch(()=>{}).then(async()=>{for(const d of e.detail?.documents||[])await api.syncDocument({type:d.handle?'open':'new',...d});render();});});
  // [ADD-OPT6-005] Tab changes highlight and reveal the matching Explorer entry.
  window.addEventListener('cluster:active-file',e=>{activeDetail=e.detail||null;void revealActive(true);});
- api.events.addEventListener('change',render);render();api.restore().then(async()=>{for(const doc of window.ClusterExplorerHost?.getOpenDocuments?.()||[])await api.syncDocument({type:doc.handle?'open':'new',...doc});setStatus(api.roots.length?'已還原 Explorer 項目':'就緒');const d=window.ClusterTabs?.getActiveDoc?.();if(d){activeDetail={docId:d.documentId,handle:d.handle,name:d.name};await revealActive(true);}}).catch(e=>setStatus('Root 還原失敗：'+e.message,true));
+ api.events.addEventListener('change',()=>{render();notifyProject()});render();api.restore().then(async()=>{for(const doc of window.ClusterExplorerHost?.getOpenDocuments?.()||[])await api.syncDocument({type:doc.handle?'open':'new',...doc});setStatus(api.roots.length?'已還原 Explorer 項目':'就緒');notifyProject();const d=window.ClusterTabs?.getActiveDoc?.();if(d){activeDetail={docId:d.documentId,handle:d.handle,name:d.name};await revealActive(true);}}).catch(e=>setStatus('Root 還原失敗：'+e.message,true));
 })();
