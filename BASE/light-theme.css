@@ -194,3 +194,42 @@ html[data-cluster-theme="light"] #clusterBackupPage .cb-status,
 html[data-cluster-theme="light"] #clusterBackupPage .cb-toolbar,
 html[data-cluster-theme="light"] #clusterBackupPage .cb-list{background:transparent!important}
 html[data-cluster-theme="light"] #clusterBackupPage .cb-item{background:#fff!important;box-shadow:0 1px 3px #1c3b6410!important}
+
+/* DPR light readability: Prism overlay needs its own daylight token palette. */
+html[data-cluster-theme="light"] #clusterSyntaxOverlay{color:#18263a!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.comment,
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.prolog{color:#52677b!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.keyword,
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.atrule{color:#7839a9!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.string,
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.char{color:#17653a!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.number,
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.boolean{color:#a14313!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.function,
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.class-name{color:#164eaa!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.operator,
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.punctuation{color:#35445a!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.property,
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.tag{color:#a52545!important}
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.selector,
+html[data-cluster-theme="light"] #clusterSyntaxOverlay .token.attr-name{color:#855000!important}
+html[data-cluster-theme="light"] #editorShell.syntax-enabled #editor{caret-color:#162e4b!important}
+html[data-cluster-theme="light"] #editorShell.syntax-enabled #editor::selection{background:#c4d9f5!important}
+/* File > Tool: explicit section heading, icons, hover, and disabled contrast. */
+html[data-cluster-theme="light"] #fileMenu :is(.cluster-tool-heading,.cluster-tool-title,.tool-section-heading,.cluster-tool-section-title,.cluster-tool-section,.cluster-tool-divider){color:#334964!important;opacity:1!important}
+html[data-cluster-theme="light"] #fileMenu :is(.cluster-tool-row,.cluster-tool-row button,.cluster-tool-row label){color:#1c304a!important}
+html[data-cluster-theme="light"] #fileMenu .cluster-tool-row:hover{background:#e3eefc!important;color:#143f77!important}
+html[data-cluster-theme="light"] #fileMenu .cluster-tool-icon{background:#e2eaf7!important;color:#1d416e!important;border-color:#bacbe0!important}
+html[data-cluster-theme="light"] #fileMenu :is(button,select):focus-visible{outline:2px solid #2463b4!important;outline-offset:1px}
+html[data-cluster-theme="light"] #fileMenu button:disabled{color:#64748b!important;opacity:1!important}
+/* Explorer launch button: distinguish selected/open from unselected without black surfaces. */
+html[data-cluster-theme="light"] #explorerButton,
+html[data-cluster-theme="light"] #explorerToggle,
+html[data-cluster-theme="light"] #cexpToggle,
+html[data-cluster-theme="light"] .explorer-toggle{background:#e2ebf8!important;color:#183f75!important;border:1px solid #aabfda!important}
+html[data-cluster-theme="light"] #explorerButton:hover,
+html[data-cluster-theme="light"] #explorerToggle:hover,
+html[data-cluster-theme="light"] #cexpToggle:hover{background:#d1e3fb!important}
+html[data-cluster-theme="light"] #explorerButton[aria-pressed="true"],
+html[data-cluster-theme="light"] #explorerToggle[aria-expanded="true"],
+html[data-cluster-theme="light"] #cexpToggle[aria-expanded="true"]{background:#c5dcfa!important;color:#123e78!important}
