@@ -70,6 +70,8 @@
   const previous=new Map((n.children||[]).map(x=>[x.kind+'\0'+x.name,x]));
   const items=[];
   for await(const h of n.handle.values()){
+   // Internal backup storage is intentionally invisible in Explorer; never delete or alter it.
+   if(h.kind==='directory'&&h.name==='backup_cluster')continue;
    if(h.kind==='file'&&h.name===ORDER_FILE)continue;
    const key=h.kind+'\0'+h.name;
    const existing=previous.get(key);
