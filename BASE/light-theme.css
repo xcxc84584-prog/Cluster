@@ -69,3 +69,16 @@ html[data-cluster-theme="light"] .logo,
 html[data-cluster-theme="light"] a{color:var(--cl-accent)}
 html[data-cluster-theme="light"] ::selection{background:#b9d6ff;color:#14253e}
 @media(prefers-reduced-motion:reduce){html[data-cluster-theme="light"] *{scroll-behavior:auto!important;transition-duration:.01ms!important}}
+
+/* Module audit: PowerShell terminal, Agent, backup cards, menus, and overlays. */
+html[data-cluster-theme="light"] :is(.cluster-terminal-panel,.terminal-toolbar,.terminal-setup,.terminal-output,.terminal-screen,#clusterAiPanel,.cai-feed,.cai-message,.cai-guide,.cai-guide-steps,.cb-item,.cb-status,.cb-head,.cb-toolbar,.cb-project-menu,.syntax-page-header,.syntax-panel-heading,.syntax-ext-entries,.cexp-head,.cexp-node,.cexp-path-actions){background:var(--cl-surface)!important;color:var(--cl-text)!important;border-color:var(--cl-border)!important}
+html[data-cluster-theme="light"] :is(.terminal-toolbar button,.terminal-setup button,.cai-bar button,.cai-setup button,.cai-workspace button,.cb-page button,.cb-dialog button,.cb-project-wrap button,#cbSubmitButton,.syntax-editor-page button,.cexp-head button){background:var(--cl-panel)!important;color:var(--cl-text)!important;border:1px solid var(--cl-border)!important}
+html[data-cluster-theme="light"] :is(.terminal-toolbar button,.terminal-setup button,.cai-bar button,.cai-setup button,.cai-workspace button,.cb-page button,.cb-dialog button,.syntax-editor-page button):hover{background:var(--cl-hover)!important}
+html[data-cluster-theme="light"] :is(.terminal-note,.terminal-toolbar #terminalState,.cai-bar span,.cb-status,.cb-head p,.syntax-panel-heading span,.cexp-heading small){color:var(--cl-muted)!important}
+html[data-cluster-theme="light"] :is(.cai-feed,.terminal-output,.terminal-screen){background:#f8fafc!important}
+html[data-cluster-theme="light"] :is(.cai-guide,.cai-setup,.terminal-setup,.cb-item,.syntax-panel){border:1px solid var(--cl-border)!important;border-radius:8px}
+html[data-cluster-theme="light"] #fileMenu .cluster-tool-row:hover{background:var(--cl-hover)!important}
+html[data-cluster-theme="light"] #fileMenu .cluster-tool-row select{background:#fff!important;color:#17263a!important}
+html[data-cluster-theme="light"] :is(.cai-danger,.cexp-danger,.cb-danger){color:#a22532!important}
+html[data-cluster-theme="light"] :is(.cai-error,.cexp-error,[role="alert"]){color:#a22532!important}
+html[data-cluster-theme="light"] :is(.cexp-node.is-selected,.cexp-node.is-active-file){background:#dceafe!important;color:#153f83!important}
