@@ -329,3 +329,47 @@ html[data-cluster-theme="light"] .cexp-path-dialog .cexp-path-actions button:hov
 html[data-cluster-theme="light"] .cexp-path-dialog .cexp-path-actions button:last-child:hover{background:#174b8e!important;color:#fff!important}
 html[data-cluster-theme="light"] .cexp-path-dialog :is(button,input):focus-visible{outline:2px solid #2865b0!important;outline-offset:2px!important}
 html[data-cluster-theme="light"] .cexp-path-dialog button:disabled{background:#e3eaf3!important;color:#455c79!important;opacity:1!important}
+
+/* Daylight UI audit v10: Security Center / AI permissions */
+html[data-cluster-theme="light"] #clusterAiPanel,
+html[data-cluster-theme="light"] #clusterAiPanel .cai-workspace,
+html[data-cluster-theme="light"] #clusterAiPanel .cai-feed{background:#f5f8fc!important;color:#182e4a!important}
+html[data-cluster-theme="light"] #clusterAiPanel :is(.cai-bar,.cai-setup,.cai-guide,.cai-msg,.cai-user){background:#fff!important;color:#1b314d!important;border-color:#bdcee2!important}
+html[data-cluster-theme="light"] #clusterAiPanel :is(.cai-bar span,.cai-setup p,.cai-guide-head span,.cai-guide-steps p,.cai-guide-state,.cai-time){color:#405b79!important;opacity:1!important}
+html[data-cluster-theme="light"] #clusterAiPanel :is(.cai-error,#caiError){color:#9b253c!important}
+html[data-cluster-theme="light"] #clusterAiPanel :is(button,.cai-guide-actions a){background:#e8f0fa!important;color:#1c426e!important;border-color:#a7bfdc!important}
+html[data-cluster-theme="light"] #clusterAiPanel :is(button,.cai-guide-actions a):hover{background:#d3e4fb!important;color:#123e78!important}
+html[data-cluster-theme="light"] #clusterAiPanel :is(input,textarea){background:#fff!important;color:#1b304c!important;border-color:#9db5d2!important}
+/* Security Center may be hosted in a separate panel; scope by active security controls. */
+html[data-cluster-theme="light"] :is(#clusterAiPermissionsPanel,#clusterAiSecurityPanel,#clusterAgentPermissionsPanel){background:#f5f8fc!important;color:#192e4a!important}
+html[data-cluster-theme="light"] :is(#clusterAiPermissionsPanel,#clusterAiSecurityPanel,#clusterAgentPermissionsPanel) :is(section,article,.card){background:#fff!important;color:#192e4a!important;border-color:#c4d2e4!important}
+/* Syntax editor: visible icon, descriptive labels and input states. */
+html[data-cluster-theme="light"] #syntaxEditorPage .syntax-page-icon{background:#dceafb!important;color:#174c91!important;border-color:#9dbbe0!important}
+html[data-cluster-theme="light"] #syntaxEditorPage .syntax-page-icon :is(svg,i){color:#174c91!important;stroke:currentColor!important;opacity:1!important}
+html[data-cluster-theme="light"] #syntaxEditorPage :is(.syntax-page-header,.syntax-page-identity,.syntax-panel-heading,.syntax-field label,.syntax-page-body label){color:#1b3554!important;opacity:1!important}
+html[data-cluster-theme="light"] #syntaxEditorPage :is(.syntax-page-indicator,.syntax-page-header span,.syntax-field small){color:#405b7b!important;opacity:1!important}
+html[data-cluster-theme="light"] #syntaxEditorPage :is(.syntax-panel,.syntax-page-body,.syntax-fields){background:#fff!important;color:#192e4a!important;border-color:#c3d1e3!important}
+html[data-cluster-theme="light"] #syntaxEditorPage :is(input,select){background:#fff!important;color:#192e4a!important;border-color:#9db5d2!important}
+html[data-cluster-theme="light"] #syntaxEditorPage :is(.syntax-tool-actions button,.syntax-ext-entry){background:#e8eff9!important;color:#173d70!important;border-color:#afc4df!important}
+html[data-cluster-theme="light"] #syntaxEditorPage :is(.syntax-tool-actions button,.syntax-ext-entry):hover{background:#d3e5fb!important;color:#10396d!important}
+/* Development Environment: replace hard-coded dark backgrounds and pale text. */
+html[data-cluster-theme="light"] #clusterDevelopmentPanel{--dev-bg:#f4f7fb;--dev-surface:#fff;--dev-raised:#e8eff8;--dev-border:#c5d3e4;--dev-text:#192f4b;--dev-muted:#405b79;--dev-accent:#205ca6;background:var(--dev-bg)!important;color:var(--dev-text)!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel :is(.dev-heading,.dev-sidebar,.dev-list,.dev-details){background:#fff!important;color:#192f4b!important;border-color:#c5d3e4!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-list-meta{background:#eaf1fa!important;color:#314c6b!important;border-color:#c5d3e4!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel :is(.dev-sidebar-title,.dev-subtitle,.dev-item-desc,.dev-muted,.dev-count){color:#405b79!important;opacity:1!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-eyebrow{color:#205ca6!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-filter{background:transparent!important;color:#203b5c!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-filter:hover{background:#e8f1fd!important;color:#143f77!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-filter[aria-pressed="true"]{background:#d7e8ff!important;color:#123e79!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-item{background:#fff!important;color:#192f4b!important;border-color:#c5d3e4!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-item:hover{background:#eaf2fc!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-item[aria-selected="true"]{background:#dbe9fc!important;box-shadow:inset 3px 0 #2864b3!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-glyph{background:#dbe8fa!important;color:#194f94!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-search{background:#fff!important;color:#1b304c!important;border-color:#9eb7d5!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-search::placeholder{color:#506782!important;opacity:1!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-action{background:#e6eef9!important;color:#1b426f!important;border-color:#9fb7d5!important;opacity:1!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-action:hover{background:#d2e4fc!important;color:#123e78!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-action.primary{background:#235eaa!important;color:#fff!important;border-color:#1d518e!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-action.primary:hover{background:#174d91!important;color:#fff!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-action:disabled{background:#e5ebf3!important;color:#435c79!important;opacity:1!important}
+html[data-cluster-theme="light"] #clusterDevelopmentPanel .dev-command{background:#eaf1fa!important;color:#19385e!important;border-color:#bacbe0!important}
